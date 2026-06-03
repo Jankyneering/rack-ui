@@ -1419,6 +1419,122 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "PCM_SL_Mechanical:MountingHole_M3_3.2mm_Pad"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "H"
+				(at 0 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "MountingHole_M3_3.2mm_Pad"
+				(at 0 5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "PCM_SL_Mechanical:MountingHole_3.2mm_Pad"
+				(at 0 -3.81 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "3.2mm Diameter Mounting Hole Pad (M3)"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "Mounting Hole"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "MountingHole_M3_3.2mm_Pad_0_1"
+				(circle
+					(center 0 0)
+					(radius 1.27)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(circle
+					(center 0 0)
+					(radius 1.7961)
+					(stroke
+						(width 2)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "MountingHole_M3_3.2mm_Pad_1_1"
+				(pin passive line
+					(at 0 -5.08 90)
+					(length 2.54)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "PY32:PY32F002AL15S6TU"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -1640,145 +1756,6 @@
 						)
 					)
 					(number "7"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "power:+3.3V"
-			(power global)
-			(pin_numbers
-				(hide yes)
-			)
-			(pin_names
-				(offset 0)
-				(hide yes)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "#PWR"
-				(at 0 -3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "+3.3V"
-				(at 0 3.556 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "global power"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "+3.3V_0_1"
-				(polyline
-					(pts
-						(xy -0.762 1.27) (xy 0 2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0 2.54) (xy 0.762 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0 0) (xy 0 2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(symbol "+3.3V_1_1"
-				(pin power_in line
-					(at 0 0 90)
-					(length 0)
-					(name ""
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2045,24 +2022,32 @@
 		)
 	)
 	(junction
+		(at 146.05 190.5)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "052a2f8d-4a7e-441e-b69e-d5a0781b3594")
+	)
+	(junction
+		(at 140.97 190.5)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "1673c63b-03cb-4f35-bb1c-0191b2f6b356")
+	)
+	(junction
 		(at 198.12 68.58)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "71fc18e9-4db0-4b02-aaab-b7840192163f")
 	)
+	(junction
+		(at 151.13 190.5)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "b5cffc84-84b7-4ebc-886d-76ab35bd6ca5")
+	)
 	(no_connect
 		(at 99.06 137.16)
 		(uuid "8fa12732-d277-4f3e-b417-3b75e4450dfc")
-	)
-	(wire
-		(pts
-			(xy 173.99 88.9) (xy 179.07 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "00c58d62-4330-4e23-9de3-81adfd4151a3")
 	)
 	(wire
 		(pts
@@ -2073,16 +2058,6 @@
 			(type default)
 		)
 		(uuid "034d5f4f-0ca7-406a-8967-bcb2e9d69605")
-	)
-	(wire
-		(pts
-			(xy 173.99 91.44) (xy 179.07 91.44)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "069fb342-b8b2-417b-bd85-05186eb16a97")
 	)
 	(wire
 		(pts
@@ -2103,6 +2078,16 @@
 			(type default)
 		)
 		(uuid "0b8e0707-1351-4e9d-a90f-53501bd56c65")
+	)
+	(wire
+		(pts
+			(xy 215.9 88.9) (xy 229.87 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0c393887-d23f-4820-b967-aa699d371f7b")
 	)
 	(wire
 		(pts
@@ -2146,6 +2131,16 @@
 	)
 	(wire
 		(pts
+			(xy 146.05 190.5) (xy 151.13 190.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "441c0c0a-7664-471a-8a66-93ee0166870e")
+	)
+	(wire
+		(pts
 			(xy 90.17 60.96) (xy 97.79 60.96)
 		)
 		(stroke
@@ -2183,6 +2178,16 @@
 			(type default)
 		)
 		(uuid "576fd1b6-4552-4cab-8558-932481c107ba")
+	)
+	(wire
+		(pts
+			(xy 130.81 190.5) (xy 140.97 190.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5d512c10-bbd2-41bf-91ad-132a17438de7")
 	)
 	(wire
 		(pts
@@ -2276,6 +2281,16 @@
 	)
 	(wire
 		(pts
+			(xy 165.1 93.98) (xy 179.07 93.98)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "908310d2-d21b-45fa-aeeb-7f8b5659b0c5")
+	)
+	(wire
+		(pts
 			(xy 74.93 55.88) (xy 74.93 50.8)
 		)
 		(stroke
@@ -2283,6 +2298,16 @@
 			(type default)
 		)
 		(uuid "92d3cba7-a698-4cca-8e5a-4c13e898c518")
+	)
+	(wire
+		(pts
+			(xy 151.13 190.5) (xy 161.29 190.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9726d36d-e4e5-4314-95d2-10abf0539e8f")
 	)
 	(wire
 		(pts
@@ -2303,6 +2328,16 @@
 			(type default)
 		)
 		(uuid "b56b45cb-c72e-4465-9df1-c359e3cf7b7d")
+	)
+	(wire
+		(pts
+			(xy 215.9 91.44) (xy 229.87 91.44)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b73c44d7-5752-4582-8480-e2aa0f460e2b")
 	)
 	(wire
 		(pts
@@ -2333,16 +2368,6 @@
 			(type default)
 		)
 		(uuid "c48b587b-75d6-4c52-9be5-09807b78a3f4")
-	)
-	(wire
-		(pts
-			(xy 173.99 93.98) (xy 179.07 93.98)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c5e83833-0434-4917-a1cb-30b8c7b79695")
 	)
 	(wire
 		(pts
@@ -2386,6 +2411,16 @@
 	)
 	(wire
 		(pts
+			(xy 165.1 88.9) (xy 179.07 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d8020899-2cc3-4b11-b349-6980563fa5b0")
+	)
+	(wire
+		(pts
 			(xy 127 82.55) (xy 127 92.71)
 		)
 		(stroke
@@ -2393,6 +2428,26 @@
 			(type default)
 		)
 		(uuid "dbd6f2ee-4a62-4d32-9625-0163f3241129")
+	)
+	(wire
+		(pts
+			(xy 165.1 91.44) (xy 179.07 91.44)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "dccf822e-d215-4ce8-ba5d-000881496b9f")
+	)
+	(wire
+		(pts
+			(xy 215.9 93.98) (xy 229.87 93.98)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "dd2415e1-1277-478f-b2d0-1e14140e330a")
 	)
 	(wire
 		(pts
@@ -2413,6 +2468,16 @@
 			(type default)
 		)
 		(uuid "f54d6d03-7b78-4652-8463-ea741e8c9018")
+	)
+	(wire
+		(pts
+			(xy 140.97 190.5) (xy 146.05 190.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fc8b9d9f-4107-4f4e-a721-62904dd7081c")
 	)
 	(wire
 		(pts
@@ -2453,6 +2518,16 @@
 			(justify right bottom)
 		)
 		(uuid "2d488792-81b3-4ea5-8cb6-503b9f8f418a")
+	)
+	(label "EncB"
+		(at 229.87 88.9 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "324168cf-8457-41b1-bf1d-ee2bcd97bd07")
 	)
 	(label "TX_EN"
 		(at 97.79 58.42 180)
@@ -2545,6 +2620,16 @@
 		(uuid "86d7b37d-e22a-4aab-8a13-3e7562869b64")
 	)
 	(label "SDA"
+		(at 165.1 93.98 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "873434ea-ff73-40d3-995c-b0726c88a690")
+	)
+	(label "SDA"
 		(at 111.76 57.15 0)
 		(effects
 			(font
@@ -2553,6 +2638,16 @@
 			(justify left bottom)
 		)
 		(uuid "87eaaf36-3673-4ca4-98a8-c1015d26d110")
+	)
+	(label "SCL"
+		(at 229.87 91.44 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "abdc06ab-4d56-4e53-ae70-b2e532dac038")
 	)
 	(label "EncA"
 		(at 132.08 82.55 270)
@@ -2604,6 +2699,16 @@
 		)
 		(uuid "da444678-438e-450d-9ff1-a2c73e04a882")
 	)
+	(label "EncSW"
+		(at 165.1 88.9 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "ed9696e5-2058-4c64-bec9-13e67413e4a2")
+	)
 	(label "SDA"
 		(at 97.79 63.5 180)
 		(effects
@@ -2613,6 +2718,16 @@
 			(justify right bottom)
 		)
 		(uuid "ee3cf668-cd0d-4437-8785-a1a8160b66e8")
+	)
+	(label "EncA"
+		(at 229.87 93.98 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "f612c9b5-e0f1-4e3e-85d1-53e56e6e8191")
 	)
 	(symbol
 		(lib_id "power:GND")
@@ -2987,84 +3102,6 @@
 			(project "rack-ui-pcb"
 				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
 					(reference "U1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:+3.3V")
-		(at 198.12 67.31 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "19915c88-6f45-451f-bd1e-7425e3cfd96c")
-		(property "Reference" "#PWR05"
-			(at 198.12 71.12 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 198.12 62.23 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 198.12 67.31 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 198.12 67.31 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 198.12 67.31 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c4c13306-b8cd-4948-aa5c-e3e411f7277f")
-		)
-		(instances
-			(project "rack-ui-pcb"
-				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
-					(reference "#PWR05")
 					(unit 1)
 				)
 			)
@@ -3534,6 +3571,84 @@
 	)
 	(symbol
 		(lib_id "power:+3V3")
+		(at 198.12 67.31 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4bbcbc6a-c007-4e42-973f-7c8cad36dda3")
+		(property "Reference" "#PWR0150"
+			(at 198.12 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3V3"
+			(at 198.12 63.1769 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 198.12 67.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 198.12 67.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3V3\""
+			(at 198.12 67.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e635edae-e87f-4240-b4a6-91a280a5e40e")
+		)
+		(instances
+			(project "rack-ui-pcb"
+				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
+					(reference "#PWR0150")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3V3")
 		(at 78.74 85.09 0)
 		(mirror y)
 		(unit 1)
@@ -3700,6 +3815,86 @@
 			(project "rack-ui-pcb"
 				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
 					(reference "J2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_SL_Mechanical:MountingHole_M3_3.2mm_Pad")
+		(at 161.29 185.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "5ebbe77c-b199-4976-b6e7-8de8104f461e")
+		(property "Reference" "H4"
+			(at 165.1 185.4199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole_M3_3.2mm_Pad"
+			(at 165.1 186.6899 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "PCM_SL_Mechanical:MountingHole_3.2mm_Pad"
+			(at 161.29 189.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 161.29 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "3.2mm Diameter Mounting Hole Pad (M3)"
+			(at 161.29 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "d93f8d61-a581-49bf-9aa4-94c561d82615")
+		)
+		(instances
+			(project "rack-ui-pcb"
+				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
+					(reference "H4")
 					(unit 1)
 				)
 			)
@@ -3943,6 +4138,86 @@
 			(project "rack-ui-pcb"
 				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
 					(reference "OLED1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_SL_Mechanical:MountingHole_M3_3.2mm_Pad")
+		(at 140.97 185.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "8f2d234a-59d6-4a1c-ac69-09060e6caadc")
+		(property "Reference" "H2"
+			(at 144.78 185.4199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole_M3_3.2mm_Pad"
+			(at 144.78 186.6899 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "PCM_SL_Mechanical:MountingHole_3.2mm_Pad"
+			(at 140.97 189.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 140.97 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "3.2mm Diameter Mounting Hole Pad (M3)"
+			(at 140.97 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "f5a524ed-40fd-496e-bb7e-cd3bb70ca25c")
+		)
+		(instances
+			(project "rack-ui-pcb"
+				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
+					(reference "H2")
 					(unit 1)
 				)
 			)
@@ -4355,19 +4630,30 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3.3V")
-		(at 88.9 121.92 0)
+		(lib_id "PCM_SL_Mechanical:MountingHole_M3_3.2mm_Pad")
+		(at 130.81 185.42 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "cbe2adfa-f6a3-425b-b0b2-ad35c29d6e2d")
-		(property "Reference" "#PWR019"
-			(at 88.9 125.73 0)
+		(uuid "c94ccb6b-ddd5-4c0b-8b98-dc70c8903833")
+		(property "Reference" "H1"
+			(at 134.62 185.4199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole_M3_3.2mm_Pad"
+			(at 134.62 186.6899 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4375,20 +4661,11 @@
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
-		(property "Value" "+3.3V"
-			(at 88.9 116.84 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 88.9 121.92 0)
+		(property "Footprint" "PCM_SL_Mechanical:MountingHole_3.2mm_Pad"
+			(at 130.81 189.23 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4399,7 +4676,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 88.9 121.92 0)
+			(at 130.81 185.42 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4409,8 +4686,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 88.9 121.92 0)
+		(property "Description" "3.2mm Diameter Mounting Hole Pad (M3)"
+			(at 130.81 185.42 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4421,12 +4698,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "cf1b6a21-0ac3-44ad-8305-4b437e39bd28")
+			(uuid "a8260147-5a81-4c42-b4e7-d3e4fa964383")
 		)
 		(instances
 			(project "rack-ui-pcb"
 				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
-					(reference "#PWR019")
+					(reference "H1")
 					(unit 1)
 				)
 			)
@@ -4505,6 +4782,84 @@
 			(project "rack-ui-pcb"
 				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
 					(reference "#PWR0143")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 121.92 100.33 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "d1b3448a-0c5b-488b-93a8-a25d6c65a03f")
+		(property "Reference" "#PWR0136"
+			(at 121.92 106.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 121.92 104.4631 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 121.92 100.33 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 121.92 100.33 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 121.92 100.33 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "b8c02679-c0ed-46a9-b3b7-3229a9dad19a")
+		)
+		(instances
+			(project "rack-ui-pcb"
+				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
+					(reference "#PWR0136")
 					(unit 1)
 				)
 			)
@@ -4621,6 +4976,164 @@
 		)
 	)
 	(symbol
+		(lib_id "PCM_SL_Mechanical:MountingHole_M3_3.2mm_Pad")
+		(at 151.13 185.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e23f15f0-f8ed-478b-b028-b13beb02daff")
+		(property "Reference" "H3"
+			(at 154.94 185.4199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole_M3_3.2mm_Pad"
+			(at 154.94 186.6899 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "PCM_SL_Mechanical:MountingHole_3.2mm_Pad"
+			(at 151.13 189.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 151.13 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "3.2mm Diameter Mounting Hole Pad (M3)"
+			(at 151.13 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "37e11c12-9209-48bf-b8f6-7274508732f2")
+		)
+		(instances
+			(project "rack-ui-pcb"
+				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
+					(reference "H3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3V3")
+		(at 88.9 121.92 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e925c9e3-273a-49f7-92c3-bebaf9f634ba")
+		(property "Reference" "#PWR0151"
+			(at 88.9 125.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3V3"
+			(at 88.9 117.7869 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 88.9 121.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 88.9 121.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3V3\""
+			(at 88.9 121.92 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "b2255595-02db-46c8-a062-8282f7c68604")
+		)
+		(instances
+			(project "rack-ui-pcb"
+				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
+					(reference "#PWR0151")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 88.9 142.24 0)
 		(unit 1)
@@ -4692,6 +5205,84 @@
 			(project "rack-ui-pcb"
 				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
 					(reference "#PWR021")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 146.05 190.5 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f29b6afa-b6a3-411f-8891-12ab254599c7")
+		(property "Reference" "#PWR016"
+			(at 146.05 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 146.05 195.58 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 146.05 190.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 146.05 190.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 146.05 190.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "5434fb8d-4f0d-41bc-aeb0-2663b12a8cab")
+		)
+		(instances
+			(project "rack-ui-pcb"
+				(path "/cba317cf-0375-4005-96e4-775fb07d31d2"
+					(reference "#PWR016")
 					(unit 1)
 				)
 			)

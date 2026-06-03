@@ -29,7 +29,7 @@ FLASH_PROGRM	?= pyocd
 
 ##### Toolchains #######
 
-ARM_TOOLCHAIN	?= /usr/bin
+ARM_TOOLCHAIN	?= /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/bin/
 
 # path to JLinkExe
 JLINKEXE		?= /opt/SEGGER/JLink/JLinkExe

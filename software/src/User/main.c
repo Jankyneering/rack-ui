@@ -74,14 +74,14 @@ static void APP_GPIO_Config(void)
   GPIO_InitStruct.Alternate  = LL_GPIO_AF_12;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /* ── ENC_A (PA0): EXTI falling edge ── */
-  GPIO_InitStruct.Pin        = LL_GPIO_PIN_0;
+  /* ── ENC_A (PA1): EXTI falling edge ── */
+  GPIO_InitStruct.Pin        = LL_GPIO_PIN_1;
   GPIO_InitStruct.Mode       = LL_GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull       = LL_GPIO_PULL_UP;
   GPIO_InitStruct.Alternate  = LL_GPIO_AF_0;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  EXTI_InitStruct.Line        = LL_EXTI_LINE_0;
+  EXTI_InitStruct.Line        = LL_EXTI_LINE_1;
   EXTI_InitStruct.LineCommand = ENABLE;
   EXTI_InitStruct.Mode        = LL_EXTI_MODE_IT;
   EXTI_InitStruct.Trigger     = LL_EXTI_TRIGGER_FALLING;
@@ -91,18 +91,18 @@ static void APP_GPIO_Config(void)
   NVIC_EnableIRQ(EXTI0_1_IRQn);
 
   /* ── ENC_B (PA1): plain input, sampled in ENC_A ISR ── */
-  GPIO_InitStruct.Pin  = LL_GPIO_PIN_1;
-  GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
-  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* ── ENC_SW (PA4): EXTI falling edge ── */
   GPIO_InitStruct.Pin  = LL_GPIO_PIN_4;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  EXTI_InitStruct.Line        = LL_EXTI_LINE_4;
+  /* ── ENC_SW (PA4): EXTI falling edge ── */
+  GPIO_InitStruct.Pin  = LL_GPIO_PIN_13;
+  GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
+  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  EXTI_InitStruct.Line        = LL_EXTI_LINE_13;
   EXTI_InitStruct.LineCommand = ENABLE;
   EXTI_InitStruct.Mode        = LL_EXTI_MODE_IT;
   EXTI_InitStruct.Trigger     = LL_EXTI_TRIGGER_FALLING;

@@ -1,9 +1,7 @@
 /**
   ******************************************************************************
-  * @file    main.h
-  * @author  MCU Application Team
-  * @brief   Header for main.c file.
-  *          This file contains the common defines of the application.
+  * @file    py32_assert.h
+  * @brief   PY32 assert file.
   ******************************************************************************
   * @attention
   *
@@ -30,43 +28,37 @@
   */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __MAIN_H
-#define __MAIN_H
+#ifndef __PY32_ASSERT_H
+#define __PY32_ASSERT_H
 
 #ifdef __cplusplus
-extern "C" {
+ extern "C" {
 #endif
 
-/* Includes ------------------------------------------------------------------*/
-#include "py32f0xx_ll_rcc.h"
-#include "py32f0xx_ll_bus.h"
-#include "py32f0xx_ll_system.h"
-#include "py32f0xx_ll_exti.h"
-#include "py32f0xx_ll_cortex.h"
-#include "py32f0xx_ll_utils.h"
-#include "py32f0xx_ll_pwr.h"
-#include "py32f0xx_ll_gpio.h"
-#include "py32f0xx_ll_i2c.h"
-
-#if defined(USE_FULL_ASSERT)
-#include "py32_assert.h"
-#endif /* USE_FULL_ASSERT */
-
-/* Private includes ----------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
+/* Includes ------------------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
-/* Exported functions prototypes ---------------------------------------------*/
-void APP_ErrorHandler(void);
-void APP_SlaveIRQCallback(void);
-void APP_SlaveIRQCallback_NACK(void);
-
-/* Private defines -----------------------------------------------------------*/
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  The assert_param macro is used for function's parameters check.
+  * @param  expr: If expr is false, it calls assert_failed function
+  *         which reports the name of the source file and the source
+  *         line number of the call that failed.
+  *         If expr is true, it returns no value.
+  * @retval None
+  */
+ #define assert_param(expr) ((expr) ? (void)0U : assert_failed((uint8_t *)__FILE__, __LINE__))
+/* Exported functions ------------------------------------------------------- */
+  void assert_failed(uint8_t* file, uint32_t line);
+#else
+  #define assert_param(expr) ((void)0U)
+#endif /* USE_FULL_ASSERT */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __MAIN_H */
+#endif /* __PY32_ASSERT_H */
 
-/************************ (C) COPYRIGHT Puya *****END OF FILE****/
+/************************ (C) COPYRIGHT Pyua *****END OF FILE****/

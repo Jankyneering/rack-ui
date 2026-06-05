@@ -4,7 +4,7 @@
 
 /* External variables from main.c */
 extern uint8_t device_memory[256];
-extern uint8_t current_reg_ptr;
+extern volatile uint8_t current_reg_ptr;
 extern __IO I2C_Slave_State_t slave_state;
 
 #define I2C_INSTANCE I2C1

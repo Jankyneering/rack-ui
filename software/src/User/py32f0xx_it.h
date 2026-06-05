@@ -42,6 +42,11 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 
 /* Exported types ------------------------------------------------------------*/
+typedef enum {
+    I2C_STATE_IDLE,
+    I2C_STATE_ADDR_RECEIVED,
+    I2C_STATE_REG_PTR_SET,
+} I2C_Slave_State_t;
 
 /* Exported constants --------------------------------------------------------*/
 
@@ -58,6 +63,6 @@ void SysTick_Handler(void);
 }
 #endif
 
-#endif /* __PY32F0XX_IT_H */
+#endif
+ /* __PY32F0XX_IT_H */
 
-/************************ (C) COPYRIGHT Puya *****END OF FILE****/

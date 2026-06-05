@@ -69,13 +69,45 @@ void I2C1_IRQHandler(void) {
         } else {
             // MASTER IS READING
             if (LL_I2C_IsActiveFlag_TXE(I2C_INSTANCE) || LL_I2C_IsActiveFlag_BTF(I2C_INSTANCE)) {
+                // if (current_reg_ptr == 0x07 && false) {
+                //     device_memory[0x07] = 0x00; // clear after read
+                // }
                 LL_I2C_TransmitData8(I2C_INSTANCE, device_memory[current_reg_ptr]);
-                current_reg_ptr++; // advance pointer for multi-byte reads
+                current_reg_ptr++;
             }
         }
         break;
 
     default:
         break;
+    }
+}
+
+void EXTI4_15_IRQHandler(void) {
+    // --- CLK (PA4) ---
+    if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_4)) {
+        LL_EXTI_ClearFlag(LL_EXTI_LINE_4);
+        // Read DT (PA5) to determine direction
+        uint16_t counter = (device_memory[0x04] << 8) | device_memory[0x05];
+        if (LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_5)) {
+            counter++;
+        } else {
+            counter--;
+        }
+        device_memory[0x04] = (counter >> 8) & 0xFF;
+        device_memory[0x05] = counter & 0xFF;
+    }
+
+    // --- SW (PA6) ---
+    if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_6)) {
+        LL_EXTI_ClearFlag(LL_EXTI_LINE_6);
+        if (!LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_6)) {
+            // Button pressed (active low)
+            device_memory[0x06] |= 0x01;
+            device_memory[0x07]++;
+        } else {
+            // Button released
+            device_memory[0x06] &= ~0x01;
+        }
     }
 }

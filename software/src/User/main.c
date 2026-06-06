@@ -19,6 +19,8 @@ volatile uint8_t device_memory[REG_COUNT];
 uint8_t current_reg_ptr            = 0;
 __IO I2C_Slave_State_t slave_state = I2C_STATE_IDLE;
 
+volatile uint32_t sys_tick_ms      = 0;
+
 /* Prototypes */
 static void APP_SystemClockConfig(void);
 static void APP_GPIOConfig(void);
@@ -36,7 +38,7 @@ int main(void) {
         if (i < REG_RW_LIMIT)
             device_memory[i] = i + 12; // Start RW regs at 0
         else if (i < REG_RO_LIMIT)
-            device_memory[i] = 0xAA; // Start RO regs at 0xAA
+            device_memory[i] = 0x00; // Start RO regs at 0x00
         else
             device_memory[i] = DEFAULT_VAL; // Everything else is 0x42
     }
@@ -44,10 +46,10 @@ int main(void) {
     while (1) {
         if (device_memory[1] == 0xFF) {
             LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_5); // ON
-            device_memory[4] = 0x55; // Update a RO register to show we can write to it internally
+            device_memory[0] = 0x55;                      // Update a RO register to show we can write to it internally
         } else {
             LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_5); // OFF
-            device_memory[4] = 0xAA; // Update the RO register back to its default
+            device_memory[0] = 0xAA;                    // Update the RO register back to its default
         }
     }
 }
@@ -62,6 +64,7 @@ static void APP_SystemClockConfig(void) {
         ;
     LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_1);
     LL_Init1msTick(8000000);
+    SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;
     LL_SetSystemCoreClock(8000000);
 }
 
@@ -134,22 +137,22 @@ static void APP_Encoder_Init(void) {
     LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
 
     // CLK (PA4), DT (PA5), SW (PA6) — input with pull-up
-    GPIO_InitStruct.Pin       = LL_GPIO_PIN_4 | LL_GPIO_PIN_5 | LL_GPIO_PIN_6;
-    GPIO_InitStruct.Mode      = LL_GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull      = LL_GPIO_PULL_UP;
+    GPIO_InitStruct.Pin  = LL_GPIO_PIN_4 | LL_GPIO_PIN_5 | LL_GPIO_PIN_6;
+    GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    // Configure EXTI for PA4 (CLK) — trigger on falling edge
+    // Configure EXTI for PA4 (CLK) — trigger on both edges
     LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
-    EXTI_InitStruct.Line   = LL_EXTI_LINE_4;
-    EXTI_InitStruct.LineCommand = ENABLE;
-    EXTI_InitStruct.Mode        = LL_EXTI_MODE_IT;
-    EXTI_InitStruct.Trigger     = LL_EXTI_TRIGGER_FALLING;
+    EXTI_InitStruct.Line                = LL_EXTI_LINE_4;
+    EXTI_InitStruct.LineCommand         = ENABLE;
+    EXTI_InitStruct.Mode                = LL_EXTI_MODE_IT;
+    EXTI_InitStruct.Trigger             = LL_EXTI_TRIGGER_RISING_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
     // Configure EXTI for PA6 (SW) — trigger on both edges to detect press and release
-    EXTI_InitStruct.Line   = LL_EXTI_LINE_6;
-    EXTI_InitStruct.Trigger     = LL_EXTI_TRIGGER_RISING_FALLING;
+    EXTI_InitStruct.Line    = LL_EXTI_LINE_6;
+    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
     // Connect EXTI lines to GPIOA

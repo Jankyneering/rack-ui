@@ -2,6 +2,13 @@
 #include "main.h"
 #include "py32f0xx_ll_i2c.h"
 
+#define ENCODER_DEBOUNCE_MS 10
+#define BUTTON_DEBOUNCE_MS 60
+
+static volatile uint32_t last_encoder_tick = 0;
+static volatile uint32_t last_button_tick  = 0;
+
+extern volatile uint32_t sys_tick_ms;
 /* External variables from main.c */
 extern uint8_t device_memory[256];
 extern volatile uint8_t current_reg_ptr;
@@ -11,7 +18,6 @@ extern __IO I2C_Slave_State_t slave_state;
 #define REG_RW_LIMIT 4
 #define DEFAULT_VAL 0x42
 
-/* Internal state types matching main.c */
 void I2C1_IRQHandler(void) {
     // --- 1. ERROR HANDLING ---
     if (LL_I2C_IsActiveFlag_AF(I2C_INSTANCE)) {
@@ -26,8 +32,7 @@ void I2C1_IRQHandler(void) {
         slave_state = I2C_STATE_IDLE;
         return;
     }
-
-    // --- 3. ADDRESS MATCH (Crucial for Repeated Start) ---
+    // --- 3. ADDRESS MATCH ---
     if (LL_I2C_IsActiveFlag_ADDR(I2C_INSTANCE)) {
         // IMPORTANT: Clearing ADDR resets the internal state for the NEW transaction
         LL_I2C_ClearFlag_ADDR(I2C_INSTANCE);
@@ -84,30 +89,54 @@ void I2C1_IRQHandler(void) {
 }
 
 void EXTI4_15_IRQHandler(void) {
-    // --- CLK (PA4) ---
+    // --- ENCODER (PA4) ---
     if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_4)) {
         LL_EXTI_ClearFlag(LL_EXTI_LINE_4);
-        // Read DT (PA5) to determine direction
-        uint16_t counter = (device_memory[0x04] << 8) | device_memory[0x05];
-        if (LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_5)) {
-            counter++;
-        } else {
-            counter--;
+
+        if ((sys_tick_ms - last_encoder_tick) >= ENCODER_DEBOUNCE_MS) {
+            last_encoder_tick         = sys_tick_ms;
+
+            static uint8_t last_state = 0;
+            uint8_t clk               = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_4) ? 1 : 0;
+            uint8_t dt                = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_5) ? 1 : 0;
+            uint8_t state             = (clk << 1) | dt;
+            uint8_t transition        = (last_state << 2) | state;
+
+            uint16_t counter = (uint16_t)((device_memory[0x04] << 8) | device_memory[0x05]);
+
+            if (transition == 0b0010 || transition == 0b1011 ||
+                transition == 0b1101 || transition == 0b0100) {
+                counter++;
+            } else if (transition == 0b0001 || transition == 0b0111 ||
+                       transition == 0b1110 || transition == 0b1000) {
+                counter--;
+            } else {
+                last_state = state;
+                return; // Invalid transition
+            }
+
+            device_memory[0x04] = (uint8_t)((counter >> 8) & 0xFF);
+            device_memory[0x05] = (uint8_t)(counter & 0xFF);
+
+            last_state          = state;
         }
-        device_memory[0x04] = (counter >> 8) & 0xFF;
-        device_memory[0x05] = counter & 0xFF;
     }
 
     // --- SW (PA6) ---
     if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_6)) {
         LL_EXTI_ClearFlag(LL_EXTI_LINE_6);
-        if (!LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_6)) {
-            // Button pressed (active low)
-            device_memory[0x06] |= 0x01;
-            device_memory[0x07]++;
-        } else {
-            // Button released
-            device_memory[0x06] &= ~0x01;
+        if ((sys_tick_ms - last_button_tick) >= BUTTON_DEBOUNCE_MS) {
+            last_button_tick = sys_tick_ms;
+            if (!LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_6)) {
+                device_memory[0x06] |= 0x01;
+                device_memory[0x07]++;
+            } else {
+                device_memory[0x06] &= ~0x01;
+            }
         }
     }
+}
+
+void SysTick_Handler(void) {
+    sys_tick_ms++;
 }

@@ -36,7 +36,7 @@ int main(void) {
     // Initialize memory
     for (int i = 0; i < REG_COUNT; i++) {
         if (i < REG_RW_LIMIT)
-            device_memory[i] = i + 12; // Start RW regs at 0
+            device_memory[i] = i + 12; // RW registers get unique values starting from 0x0C
         else if (i < REG_RO_LIMIT)
             device_memory[i] = 0x00; // Start RO regs at 0x00
         else
@@ -142,15 +142,15 @@ static void APP_Encoder_Init(void) {
     GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    // Configure EXTI for PA4 (CLK) — trigger on both edges
+    // Configure EXTI for PA4 (CLK) — trigger on falling edge to detect rotation
     LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
     EXTI_InitStruct.Line                = LL_EXTI_LINE_4;
     EXTI_InitStruct.LineCommand         = ENABLE;
     EXTI_InitStruct.Mode                = LL_EXTI_MODE_IT;
-    EXTI_InitStruct.Trigger             = LL_EXTI_TRIGGER_RISING_FALLING;
+    EXTI_InitStruct.Trigger             = LL_EXTI_TRIGGER_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
-    // Configure EXTI for PA6 (SW) — trigger on both edges to detect press and release
+    // Configure EXTI for PA6 (SW) — trigger on Falling edge to detect button press
     EXTI_InitStruct.Line    = LL_EXTI_LINE_6;
     EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);

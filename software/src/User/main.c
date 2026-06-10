@@ -20,6 +20,8 @@ uint8_t current_reg_ptr            = 0;
 __IO I2C_Slave_State_t slave_state = I2C_STATE_IDLE;
 
 volatile uint32_t sys_tick_ms      = 0;
+uint32_t last_led_update_ms = 0;
+uint8_t on_count = 0;
 
 /* Prototypes */
 static void APP_SystemClockConfig(void);
@@ -32,6 +34,8 @@ int main(void) {
     APP_GPIOConfig();
     APP_I2C_Slave_Init();
     APP_Encoder_Init();
+
+    Charlie_Init();
 
     // Initialize memory
     for (int i = 0; i < REG_COUNT; i++) {
@@ -51,6 +55,18 @@ int main(void) {
             LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_5); // OFF
             device_memory[0] = 0xAA;                    // Update the RO register back to its default
         }
+        if ((sys_tick_ms - last_led_update_ms) >= 1000) {
+            last_led_update_ms = sys_tick_ms;
+
+            Charlie_SetLED(on_count, 1);
+            
+
+            on_count++;
+            if (on_count >= 12)
+                on_count = 0;
+        }
+        // charlie_all_hiz();
+        // charlie_drive(11);
     }
 }
 
@@ -136,32 +152,32 @@ static void APP_Encoder_Init(void) {
     // GPIOA clock already enabled by I2C init
     LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    // CLK (PA4), DT (PA5), SW (PA6) — input with pull-up
-    GPIO_InitStruct.Pin  = LL_GPIO_PIN_4 | LL_GPIO_PIN_5 | LL_GPIO_PIN_6;
+    // CLK (PA0), DT (PA12), SW (PA1) — input with pull-up
+    GPIO_InitStruct.Pin  = LL_GPIO_PIN_0 | LL_GPIO_PIN_12 | LL_GPIO_PIN_1;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    // Configure EXTI for PA4 (CLK) — trigger on falling edge to detect rotation
+    // Configure EXTI for PA0 (CLK) — trigger on falling edge to detect rotation
     LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
-    EXTI_InitStruct.Line                = LL_EXTI_LINE_4;
+    EXTI_InitStruct.Line                = LL_EXTI_LINE_0;
     EXTI_InitStruct.LineCommand         = ENABLE;
     EXTI_InitStruct.Mode                = LL_EXTI_MODE_IT;
     EXTI_InitStruct.Trigger             = LL_EXTI_TRIGGER_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
-    // Configure EXTI for PA6 (SW) — trigger on Falling edge to detect button press
-    EXTI_InitStruct.Line    = LL_EXTI_LINE_6;
+    // Configure EXTI for PA1 (SW) — trigger on Falling edge to detect button press
+    EXTI_InitStruct.Line    = LL_EXTI_LINE_1;
     EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
     // Connect EXTI lines to GPIOA
-    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE4);
-    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE6);
+    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE0);
+    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE1);
 
     // Enable NVIC
-    NVIC_SetPriority(EXTI4_15_IRQn, 1); // lower priority than I2C
-    NVIC_EnableIRQ(EXTI4_15_IRQn);
+    NVIC_SetPriority(EXTI0_1_IRQn, 1); // lower priority than I2C
+    NVIC_EnableIRQ(EXTI0_1_IRQn);
 }
 
 void APP_ErrorHandler(void) {

@@ -1,4 +1,2 @@
-pack:
-  - Misc/Puya.PY32F0xx_DFP.1.1.7.pack
 connect_mode: under-reset
 frequency: 1000000

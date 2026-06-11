@@ -710,7 +710,7 @@
         "uuid": "cba317cf-0375-4005-96e4-775fb07d31d2"
       }
     ],
-    "used_designators": "C1-2,C11-12,#PWR6,#PWR13-15,#PWR133,#PWR140,#PWR155,U2-3",
+    "used_designators": "",
     "variants": []
   },
   "sheets": [

@@ -22,6 +22,7 @@ __IO I2C_Slave_State_t slave_state = I2C_STATE_IDLE;
 volatile uint32_t sys_tick_ms      = 0;
 uint32_t last_led_update_ms = 0;
 uint8_t on_count = 0;
+bool all_on = false;
 
 /* Prototypes */
 static void APP_SystemClockConfig(void);
@@ -55,18 +56,41 @@ int main(void) {
             LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_5); // OFF
             device_memory[0] = 0xAA;                    // Update the RO register back to its default
         }
-        if ((sys_tick_ms - last_led_update_ms) >= 1000) {
+        if ((sys_tick_ms - last_led_update_ms) >= 50) {
             last_led_update_ms = sys_tick_ms;
 
-            Charlie_SetLED(on_count, 1);
-            
+            // Turn On/off in sequence
+            // if (!all_on) {
+            //     Charlie_SetLED(on_count, 1);
+            // } else {
+            //     Charlie_SetLED(on_count, 0);
+            // }
+
+            // on_count++;
+            // if (on_count >= 12) {
+            //     all_on = !all_on;
+            //     on_count = 0;
+            // }
+
+            // Set brightness for all LEDs based on on_count
+            if (!all_on) {
+                for (int i = 0; i < CHARLIE_LED_COUNT; i++) {
+                    Charlie_SetLED(i, on_count);
+                }
+            } else {
+                 for (int i = 0; i < CHARLIE_LED_COUNT; i++) {
+                    Charlie_SetLED(i, CHARLIE_PWM_STEPS - on_count);
+                }
+            }
 
             on_count++;
-            if (on_count >= 12)
+            if (on_count >= CHARLIE_PWM_STEPS) {
+                all_on = !all_on;
                 on_count = 0;
-        }
-        // charlie_all_hiz();
-        // charlie_drive(11);
+            }
+        };
+
+        Charlie_Tick();
     }
 }
 

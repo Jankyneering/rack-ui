@@ -1,6 +1,8 @@
 /* charlieplex.c */
 #include "charlieplex.h"
 
+static uint8_t charlie_brightness[CHARLIE_LED_COUNT] = {0}; // 0 means off, max is CHARLIE_PWM_STEPS
+
 static const uint32_t charlie_pins[CHARLIE_PIN_COUNT] = {
     CHARLIE_X0,
     CHARLIE_X1,
@@ -41,7 +43,7 @@ void Charlie_Init(void) {
     charlie_all_hiz();
 }
 
-void Charlie_SetLED(uint8_t led_index, uint8_t state) {
+static void Charlie_ScanLED(uint8_t led_index, uint8_t state) {
     charlie_all_hiz();
 
     if (!state || led_index >= CHARLIE_LED_COUNT)
@@ -54,6 +56,33 @@ void Charlie_SetLED(uint8_t led_index, uint8_t state) {
     LL_GPIO_ResetOutputPin(CHARLIE_GPIO, charlie_pins[cathode]);
 }
 
+void Charlie_SetLED(uint8_t led_index, uint8_t brightness) {
+    if (led_index >= CHARLIE_LED_COUNT || brightness >= CHARLIE_PWM_STEPS)
+        return;
+
+    charlie_brightness[led_index] = brightness;
+}
+
 void Charlie_Off(void) {
     charlie_all_hiz();
+}
+
+
+static uint8_t _pwm_step = 0;
+static uint8_t _led_index = 0;
+
+void Charlie_Tick(void) {
+
+    if (charlie_brightness[_led_index] > _pwm_step)
+        Charlie_ScanLED(_led_index, 1);
+    else
+        Charlie_ScanLED(_led_index, 0);
+
+    _led_index++;
+    if (_led_index >= CHARLIE_LED_COUNT) {
+        _led_index = 0;
+        _pwm_step++;
+        if (_pwm_step >= CHARLIE_PWM_STEPS)
+            _pwm_step = 0;
+    }
 }

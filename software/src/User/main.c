@@ -20,9 +20,9 @@ uint8_t current_reg_ptr            = 0;
 __IO I2C_Slave_State_t slave_state = I2C_STATE_IDLE;
 
 volatile uint32_t sys_tick_ms      = 0;
-uint32_t last_led_update_ms = 0;
-uint8_t on_count = 0;
-bool all_on = false;
+uint32_t last_led_update_ms        = 0;
+uint8_t on_count                   = 0;
+bool all_on                        = false;
 
 /* Prototypes */
 static void APP_SystemClockConfig(void);
@@ -78,14 +78,14 @@ int main(void) {
                     Charlie_SetLED(i, on_count);
                 }
             } else {
-                 for (int i = 0; i < CHARLIE_LED_COUNT; i++) {
+                for (int i = 0; i < CHARLIE_LED_COUNT; i++) {
                     Charlie_SetLED(i, CHARLIE_PWM_STEPS - on_count);
                 }
             }
 
             on_count++;
             if (on_count >= CHARLIE_PWM_STEPS) {
-                all_on = !all_on;
+                all_on   = !all_on;
                 on_count = 0;
             }
         };

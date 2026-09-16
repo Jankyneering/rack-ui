@@ -17,7 +17,7 @@
 
 /* Private variables */
 volatile uint8_t device_memory[REG_COUNT];
-uint8_t current_reg_ptr            = 0;
+volatile uint8_t current_reg_ptr   = 0;
 __IO I2C_Slave_State_t slave_state = I2C_STATE_IDLE;
 
 volatile uint32_t sys_tick_ms      = 0;
@@ -198,32 +198,37 @@ static void APP_Encoder_Init(void) {
     // GPIOA clock already enabled by I2C init
     LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    // CLK (PA0), DT (PA12), SW (PA1) — input with pull-up
-    GPIO_InitStruct.Pin  = LL_GPIO_PIN_0 | LL_GPIO_PIN_12 | LL_GPIO_PIN_1;
+    // EncA (PA5), EncB (PA4), EncSW (PA0) — input with pull-up
+    GPIO_InitStruct.Pin  = LL_GPIO_PIN_5 | LL_GPIO_PIN_4 | LL_GPIO_PIN_0;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    // Configure EXTI for PA0 (CLK) — trigger on falling edge to detect rotation
+    // Configure EXTI for PA5 (EncA) — trigger on falling edge to detect rotation;
+    // direction is read from EncB's level at the moment EncA transitions.
     LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
-    EXTI_InitStruct.Line                = LL_EXTI_LINE_0;
+    EXTI_InitStruct.Line                = LL_EXTI_LINE_5;
     EXTI_InitStruct.LineCommand         = ENABLE;
     EXTI_InitStruct.Mode                = LL_EXTI_MODE_IT;
     EXTI_InitStruct.Trigger             = LL_EXTI_TRIGGER_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
-    // Configure EXTI for PA1 (SW) — trigger on Falling edge to detect button press
-    EXTI_InitStruct.Line    = LL_EXTI_LINE_1;
+    // Configure EXTI for PA0 (EncSW) — trigger on both edges to detect press/release
+    EXTI_InitStruct.Line    = LL_EXTI_LINE_0;
     EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING_FALLING;
     LL_EXTI_Init(&EXTI_InitStruct);
 
     // Connect EXTI lines to GPIOA
+    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE5);
     LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE0);
-    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE1);
 
-    // Enable NVIC
+    // Line 0 is serviced by EXTI0_1_IRQHandler, line 5 by EXTI4_15_IRQHandler —
+    // both vectors need enabling, not just one, since EncSW and EncA now sit
+    // on different NVIC lines.
     NVIC_SetPriority(EXTI0_1_IRQn, 1); // lower priority than I2C
     NVIC_EnableIRQ(EXTI0_1_IRQn);
+    NVIC_SetPriority(EXTI4_15_IRQn, 1); // lower priority than I2C
+    NVIC_EnableIRQ(EXTI4_15_IRQn);
 }
 
 static void APP_BuildGammaLUT(void) {

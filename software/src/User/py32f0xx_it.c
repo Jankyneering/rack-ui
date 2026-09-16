@@ -10,7 +10,7 @@ static volatile uint32_t last_button_tick  = 0;
 
 extern volatile uint32_t sys_tick_ms;
 /* External variables from main.c */
-extern uint8_t device_memory[256];
+extern volatile uint8_t device_memory[256];
 extern volatile uint8_t current_reg_ptr;
 extern __IO I2C_Slave_State_t slave_state;
 
@@ -73,7 +73,7 @@ void I2C1_IRQHandler(void) {
             }
         } else {
             // MASTER IS READING
-            if (!LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_6)) {
+            if (!LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0)) {
                 device_memory[0x06] |= 0x01;
             } else {
                 device_memory[0x06] &= ~0x01;
@@ -93,32 +93,35 @@ void I2C1_IRQHandler(void) {
     }
 }
 
-void EXTI4_15_IRQHandler(void) {
-    // --- ENCODER (PA4) ---
-    if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_4)) {
-        LL_EXTI_ClearFlag(LL_EXTI_LINE_4);
-
-        if ((sys_tick_ms - last_encoder_tick) >= ENCODER_DEBOUNCE_MS) {
-            last_encoder_tick         = sys_tick_ms;
-
-            bool dt                = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_5) ? 1 : 0;
-
-            uint16_t counter          = (uint16_t)((device_memory[0x04] << 8) | device_memory[0x05]);
-
-            dt ? counter++ : counter--;
-
-            device_memory[0x04] = (uint8_t)((counter >> 8) & 0xFF);
-            device_memory[0x05] = (uint8_t)(counter & 0xFF);
-        }
-    }
-
-    // --- SW (PA6) ---
-    if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_6)) {
-        LL_EXTI_ClearFlag(LL_EXTI_LINE_6);
-        bool button_pressed = !LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_6);
+void EXTI0_1_IRQHandler(void) {
+    // --- SW (EncSW, PA0) ---
+    if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_0)) {
+        LL_EXTI_ClearFlag(LL_EXTI_LINE_0);
+        bool button_pressed = !LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0);
         if ((sys_tick_ms - last_button_tick) >= BUTTON_DEBOUNCE_MS) {
             last_button_tick = sys_tick_ms;
             button_pressed ? device_memory[0x07]++ : (void)0; // Increment on press, do nothing on release
+        }
+    }
+}
+
+void EXTI4_15_IRQHandler(void) {
+    // --- Encoder rotation (EncA, PA5) ---
+    if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_5)) {
+        LL_EXTI_ClearFlag(LL_EXTI_LINE_5);
+
+        if ((sys_tick_ms - last_encoder_tick) >= ENCODER_DEBOUNCE_MS) {
+            last_encoder_tick = sys_tick_ms;
+
+            // EncA just transitioned; EncB's level at this instant gives direction.
+            bool enc_b = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_4) ? 1 : 0;
+
+            uint16_t counter = (uint16_t)((device_memory[0x04] << 8) | device_memory[0x05]);
+
+            enc_b ? counter++ : counter--;
+
+            device_memory[0x04] = (uint8_t)((counter >> 8) & 0xFF);
+            device_memory[0x05] = (uint8_t)(counter & 0xFF);
         }
     }
 }

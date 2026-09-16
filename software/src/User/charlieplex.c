@@ -25,21 +25,28 @@ static const uint8_t charlie_map[CHARLIE_LED_COUNT][2] = {
     {3, 1},
 };
 
-static void charlie_all_hiz(void) {
-    uint32_t pinMask = 0;
+/* Bitmask of all charlieplex pins, built once in Charlie_Init().
+ * Mode and pull never change after init, so the hot path (called every
+ * Charlie_Tick(), i.e. every superloop iteration) only needs to touch
+ * OTYPER + ODR instead of re-running SetPinMode/SetPinPull on every pin. */
+static uint32_t charlie_all_pins_mask = 0;
 
+static void charlie_all_hiz(void) {
+    LL_GPIO_SetPinOutputType(CHARLIE_GPIO, charlie_all_pins_mask, LL_GPIO_OUTPUT_OPENDRAIN);
+    LL_GPIO_SetOutputPin(CHARLIE_GPIO, charlie_all_pins_mask); // Set all high (Hi-Z due to open-drain)
+}
+
+void Charlie_Init(void) {
+    LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOA);
+
+    uint32_t pinMask = 0;
     for (int i = 0; i < CHARLIE_PIN_COUNT; i++) {
         LL_GPIO_SetPinMode(CHARLIE_GPIO, charlie_pins[i], LL_GPIO_MODE_OUTPUT);
         LL_GPIO_SetPinPull(CHARLIE_GPIO, charlie_pins[i], LL_GPIO_PULL_NO);
         pinMask |= charlie_pins[i];
     }
+    charlie_all_pins_mask = pinMask;
 
-    LL_GPIO_SetPinOutputType(CHARLIE_GPIO, pinMask, LL_GPIO_OUTPUT_OPENDRAIN);
-    LL_GPIO_SetOutputPin(CHARLIE_GPIO, pinMask); // Set all high (Hi-Z due to open-drain)
-}
-
-void Charlie_Init(void) {
-    LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOA);
     charlie_all_hiz();
 }
 

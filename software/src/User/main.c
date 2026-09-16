@@ -1,4 +1,5 @@
 #include "main.h"
+#include <math.h>
 #include <stddef.h>
 
 /* I2C Configuration */
@@ -24,17 +25,32 @@ uint32_t last_led_update_ms        = 0;
 uint8_t on_count                   = 0;
 bool all_on                        = false;
 
+/* LUTs */
+/* Gamma-corrected brightness lookup table, indexed by on_count (0..CHARLIE_PWM_STEPS).
+ * gamma_lut[i] = round( (i/CHARLIE_PWM_STEPS)^2 * (CHARLIE_PWM_STEPS - 1) )
+ * Built once in APP_BuildGammaLUT() below using integer math only, so the
+ * hot loop never touches pow()/floating point (the PY32F0 core has no FPU,
+ * so a software pow() call there was the actual source of the slowdown). */
+#define GAMMA_LUT_SIZE (CHARLIE_PWM_STEPS + 1)
+static uint8_t gamma_lut[GAMMA_LUT_SIZE];
+
+/* Gamma exponent for the brightness curve. Change this one value to retune it
+ * (2.0 = simple square law, 2.2 ≈ perceptual/sRGB-style curve, etc). */
+#define CHARLIE_GAMMA 2.2f
+
 /* Prototypes */
 static void APP_SystemClockConfig(void);
 static void APP_GPIOConfig(void);
 static void APP_I2C_Slave_Init(void);
 static void APP_Encoder_Init(void);
+static void APP_BuildGammaLUT(void);
 
 int main(void) {
     APP_SystemClockConfig();
     APP_GPIOConfig();
     APP_I2C_Slave_Init();
     APP_Encoder_Init();
+    APP_BuildGammaLUT();
 
     Charlie_Init();
 
@@ -72,21 +88,27 @@ int main(void) {
             //     on_count = 0;
             // }
 
-            // Set brightness for all LEDs based on on_count
-            if (!all_on) {
-                for (int i = 0; i < CHARLIE_LED_COUNT; i++) {
-                    Charlie_SetLED(i, on_count);
-                }
-            } else {
-                for (int i = 0; i < CHARLIE_LED_COUNT; i++) {
-                    Charlie_SetLED(i, CHARLIE_PWM_STEPS - on_count);
-                }
+            // Set brightness for all LEDs based on on_count (same gamma value
+            // for every LED, so it only needs to be looked up once per tick).
+            uint8_t brightness = gamma_lut[on_count];
+            for (int i = 0; i < CHARLIE_LED_COUNT; i++) {
+                Charlie_SetLED(i, brightness);
             }
 
-            on_count++;
-            if (on_count >= CHARLIE_PWM_STEPS) {
-                all_on   = !all_on;
-                on_count = 0;
+            if (!all_on) {
+                if (on_count < CHARLIE_PWM_STEPS) {
+                    on_count++;
+                }
+                if (on_count >= CHARLIE_PWM_STEPS) {
+                    all_on = true;
+                }
+            } else {
+                if (on_count > 0) {
+                    on_count--;
+                }
+                if (on_count == 0) {
+                    all_on = false;
+                }
             }
         };
 
@@ -202,6 +224,17 @@ static void APP_Encoder_Init(void) {
     // Enable NVIC
     NVIC_SetPriority(EXTI0_1_IRQn, 1); // lower priority than I2C
     NVIC_EnableIRQ(EXTI0_1_IRQn);
+}
+
+static void APP_BuildGammaLUT(void) {
+    // gamma_lut[i] = round( (i / CHARLIE_PWM_STEPS)^CHARLIE_GAMMA * (CHARLIE_PWM_STEPS - 1) )
+    // powf() runs 13 times total, here at boot, never in the 50ms tick loop —
+    // that one-time cost is negligible; it's calling pow() every tick that was slow.
+    for (uint32_t i = 0; i < GAMMA_LUT_SIZE; i++) {
+        float x = (float)i / (float)CHARLIE_PWM_STEPS;
+        float g = powf(x, CHARLIE_GAMMA);
+        gamma_lut[i] = (uint8_t)(g * (float)(CHARLIE_PWM_STEPS - 1) + 0.5f); // round, not truncate
+    }
 }
 
 void APP_ErrorHandler(void) {

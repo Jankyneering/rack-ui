@@ -5,6 +5,14 @@
 static uint8_t charlie_brightness[CHARLIE_LED_COUNT] = {0}; // 0 means off, max is CHARLIE_PWM_STEPS - 1
 // Top brightness value accepted by Charlie_SetLED (64 = full on for all 64 PWM steps).
 
+/* LUTs */
+/* Gamma-corrected brightness lookup table, indexed by on_count (0..CHARLIE_PWM_STEPS-1).
+ * gamma_lut[i] = round( (i/(CHARLIE_PWM_STEPS-1))^CHARLIE_GAMMA * CHARLIE_PWM_STEPS )
+ * The top entry (i = CHARLIE_PWM_STEPS-1) maps to CHARLIE_PWM_STEPS (64 = full on
+ * for all 64 PWM steps), so the top of the ramp reaches 100% duty instead of 63/64.
+ * Built once in APP_BuildGammaLUT() below; the hot loop only indexes it. */
+static uint8_t gamma_lut[GAMMA_LUT_SIZE];
+
 static const uint32_t charlie_pins[CHARLIE_PIN_COUNT] = {
     CHARLIE_X0,
     CHARLIE_X1,
@@ -67,6 +75,17 @@ static void charlie_build_states(void) {
     charlie_states[CHARLIE_OFF_STATE].odr_bits    = charlie_all_pins_mask;
 }
 
+static void charlie_build_luts(void) {
+    // gamma_lut[i] = round( (i / (CHARLIE_PWM_STEPS-1))^CHARLIE_GAMMA * CHARLIE_PWM_STEPS )
+    // powf() runs once per entry here at boot, never in the 50ms tick loop —
+    // that one-time cost is negligible; it's calling pow() every tick that was slow.
+    for (uint32_t i = 0; i < GAMMA_LUT_SIZE; i++) {
+        float x = (float)i / (float)(CHARLIE_PWM_STEPS - 1);
+        float g = powf(x, CHARLIE_GAMMA);
+        gamma_lut[i] = (uint8_t)(g * (float)CHARLIE_PWM_STEPS + 0.5f); // round, not truncate
+    }
+}
+
 static inline void charlie_apply_state(uint8_t state_index) {
     if (state_index == charlie_last_state)
         return;
@@ -93,6 +112,8 @@ void Charlie_Init(void) {
     charlie_all_pins_mask = pinMask;
 
     charlie_build_states();
+    charlie_build_luts();
+
     charlie_all_hiz();
 }
 
@@ -100,11 +121,11 @@ void Charlie_SetLED(uint8_t led_index, uint8_t brightness) {
     if (led_index >= CHARLIE_LED_COUNT || brightness > CHARLIE_PWM_STEPS)
         return;
 
-    charlie_brightness[led_index] = brightness;
+    charlie_brightness[led_index] = gamma_lut[brightness];
 }
 
 void Charlie_SetAllLEDs(uint8_t brightness) {
-    memset(charlie_brightness, brightness, CHARLIE_LED_COUNT);
+    memset(charlie_brightness, gamma_lut[brightness], CHARLIE_LED_COUNT);
 }
 
 void Charlie_Off(void) {

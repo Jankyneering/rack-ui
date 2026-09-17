@@ -1,6 +1,7 @@
 /* charlieplex.h */
 #pragma once
 #include "main.h"
+#include <math.h>
 #include <stdint.h>
 
 #define CHARLIE_PIN_COUNT  4
@@ -19,6 +20,13 @@
 #define CHARLIE_X1    LL_GPIO_PIN_7
 #define CHARLIE_X2    LL_GPIO_PIN_12
 #define CHARLIE_X3    LL_GPIO_PIN_8
+
+/* LUTs */
+#define GAMMA_LUT_SIZE (CHARLIE_PWM_STEPS)
+
+/* Gamma exponent for the brightness curve. Change this one value to retune it
+ * (2.0 = simple square law, 2.2 ≈ perceptual/sRGB-style curve, etc). */
+#define CHARLIE_GAMMA 2.2f
 
 
 void Charlie_Init(void);

@@ -1,5 +1,4 @@
 #include "main.h"
-#include <math.h>
 #include <stddef.h>
 
 /* I2C Configuration */
@@ -25,33 +24,18 @@ uint32_t last_led_update_ms        = 0;
 uint8_t on_count                   = 0;
 bool all_on                        = false;
 
-/* LUTs */
-/* Gamma-corrected brightness lookup table, indexed by on_count (0..CHARLIE_PWM_STEPS-1).
- * gamma_lut[i] = round( (i/(CHARLIE_PWM_STEPS-1))^CHARLIE_GAMMA * CHARLIE_PWM_STEPS )
- * The top entry (i = CHARLIE_PWM_STEPS-1) maps to CHARLIE_PWM_STEPS (64 = full on
- * for all 64 PWM steps), so the top of the ramp reaches 100% duty instead of 63/64.
- * Built once in APP_BuildGammaLUT() below; the hot loop only indexes it. */
-#define GAMMA_LUT_SIZE (CHARLIE_PWM_STEPS)
-static uint8_t gamma_lut[GAMMA_LUT_SIZE];
-
-/* Gamma exponent for the brightness curve. Change this one value to retune it
- * (2.0 = simple square law, 2.2 ≈ perceptual/sRGB-style curve, etc). */
-#define CHARLIE_GAMMA 2.2f
-
 /* Prototypes */
 static void APP_SystemClockConfig(void);
 static void APP_GPIOConfig(void);
 static void APP_I2C_Slave_Init(void);
 static void APP_Encoder_Init(void);
 static void APP_Charlie_Timer_Init(void);
-static void APP_BuildGammaLUT(void);
 
 int main(void) {
     APP_SystemClockConfig();
     APP_GPIOConfig();
     APP_I2C_Slave_Init();
     APP_Encoder_Init();
-    APP_BuildGammaLUT();
 
     Charlie_Init();
     APP_Charlie_Timer_Init();
@@ -93,8 +77,7 @@ int main(void) {
             // Set brightness for all LEDs based on on_count (same gamma value
             // for every LED, so the whole array is set in one memset rather
             // than 12 validated Charlie_SetLED() calls).
-            uint8_t brightness = gamma_lut[on_count];
-            Charlie_SetAllLEDs(brightness);
+            Charlie_SetAllLEDs(on_count);
 
             if (!all_on) {
                 if (on_count < CHARLIE_PWM_STEPS) {
@@ -259,17 +242,6 @@ static void APP_Charlie_Timer_Init(void) {
     NVIC_EnableIRQ(TIM16_IRQn);
 
     LL_TIM_EnableCounter(TIM16);
-}
-
-static void APP_BuildGammaLUT(void) {
-    // gamma_lut[i] = round( (i / (CHARLIE_PWM_STEPS-1))^CHARLIE_GAMMA * CHARLIE_PWM_STEPS )
-    // powf() runs once per entry here at boot, never in the 50ms tick loop —
-    // that one-time cost is negligible; it's calling pow() every tick that was slow.
-    for (uint32_t i = 0; i < GAMMA_LUT_SIZE; i++) {
-        float x = (float)i / (float)(CHARLIE_PWM_STEPS - 1);
-        float g = powf(x, CHARLIE_GAMMA);
-        gamma_lut[i] = (uint8_t)(g * (float)CHARLIE_PWM_STEPS + 0.5f); // round, not truncate
-    }
 }
 
 void APP_ErrorHandler(void) {

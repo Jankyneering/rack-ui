@@ -1,0 +1,33 @@
+name: firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: software/src
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ARM GCC toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi
+
+      - name: Build firmware
+        run: make ARM_TOOLCHAIN=/usr all
+
+      - name: Print size
+        run: arm-none-eabi-size Build/app.elf
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: software/src/Build/

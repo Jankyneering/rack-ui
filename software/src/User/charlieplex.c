@@ -2,7 +2,8 @@
 #include "charlieplex.h"
 #include <string.h>
 
-static uint8_t charlie_brightness[CHARLIE_LED_COUNT] = {0}; // 0 means off, max is CHARLIE_PWM_STEPS
+static uint8_t charlie_brightness[CHARLIE_LED_COUNT] = {0}; // 0 means off, max is CHARLIE_PWM_STEPS - 1
+// Top brightness value accepted by Charlie_SetLED (64 = full on for all 64 PWM steps).
 
 static const uint32_t charlie_pins[CHARLIE_PIN_COUNT] = {
     CHARLIE_X0,
@@ -96,7 +97,7 @@ void Charlie_Init(void) {
 }
 
 void Charlie_SetLED(uint8_t led_index, uint8_t brightness) {
-    if (led_index >= CHARLIE_LED_COUNT || brightness >= CHARLIE_PWM_STEPS)
+    if (led_index >= CHARLIE_LED_COUNT || brightness > CHARLIE_PWM_STEPS)
         return;
 
     charlie_brightness[led_index] = brightness;

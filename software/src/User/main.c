@@ -26,12 +26,12 @@ uint8_t on_count                   = 0;
 bool all_on                        = false;
 
 /* LUTs */
-/* Gamma-corrected brightness lookup table, indexed by on_count (0..CHARLIE_PWM_STEPS).
- * gamma_lut[i] = round( (i/CHARLIE_PWM_STEPS)^2 * (CHARLIE_PWM_STEPS - 1) )
- * Built once in APP_BuildGammaLUT() below using integer math only, so the
- * hot loop never touches pow()/floating point (the PY32F0 core has no FPU,
- * so a software pow() call there was the actual source of the slowdown). */
-#define GAMMA_LUT_SIZE (CHARLIE_PWM_STEPS + 1)
+/* Gamma-corrected brightness lookup table, indexed by on_count (0..CHARLIE_PWM_STEPS-1).
+ * gamma_lut[i] = round( (i/(CHARLIE_PWM_STEPS-1))^CHARLIE_GAMMA * CHARLIE_PWM_STEPS )
+ * The top entry (i = CHARLIE_PWM_STEPS-1) maps to CHARLIE_PWM_STEPS (64 = full on
+ * for all 64 PWM steps), so the top of the ramp reaches 100% duty instead of 63/64.
+ * Built once in APP_BuildGammaLUT() below; the hot loop only indexes it. */
+#define GAMMA_LUT_SIZE (CHARLIE_PWM_STEPS)
 static uint8_t gamma_lut[GAMMA_LUT_SIZE];
 
 /* Gamma exponent for the brightness curve. Change this one value to retune it
@@ -43,6 +43,7 @@ static void APP_SystemClockConfig(void);
 static void APP_GPIOConfig(void);
 static void APP_I2C_Slave_Init(void);
 static void APP_Encoder_Init(void);
+static void APP_Charlie_Timer_Init(void);
 static void APP_BuildGammaLUT(void);
 
 int main(void) {
@@ -53,6 +54,7 @@ int main(void) {
     APP_BuildGammaLUT();
 
     Charlie_Init();
+    APP_Charlie_Timer_Init();
 
     // Initialize memory
     for (int i = 0; i < REG_COUNT; i++) {
@@ -111,7 +113,9 @@ int main(void) {
             }
         };
 
-        Charlie_Tick();
+        // Charlie_Tick() now runs from the TIM16 update ISR at a fixed cadence;
+        // sleep until any interrupt wakes us instead of spinning on the loop.
+        __WFI();
     }
 }
 
@@ -230,14 +234,40 @@ static void APP_Encoder_Init(void) {
     NVIC_EnableIRQ(EXTI4_15_IRQn);
 }
 
+/* Charlieplex refresh timer. The main loop used to spin-call Charlie_Tick()
+ * unconditionally, which pinned the CPU at 100% and tied PWM timing to loop
+ * iteration count. TIM16 now fires a periodic update interrupt that advances
+ * Charlie_Tick() at a fixed cadence; the main loop sleeps with __WFI between
+ * ticks. With the 8 MHz HSI prescaled to a 1 MHz counting clock and a 24 us
+ * period, one full PWM cycle (12 LEDs * 64 steps = 768 sub-frames) takes
+ * ~18.4 ms ~ 54 Hz, flicker-free. */
+#define CHARLIE_TICK_US 24
+
+static void APP_Charlie_Timer_Init(void) {
+    LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_TIM16);
+
+    LL_TIM_SetPrescaler(TIM16, __LL_TIM_CALC_PSC(SystemCoreClock, 1000000));
+    LL_TIM_SetAutoReload(TIM16, CHARLIE_TICK_US - 1);
+    LL_TIM_SetCounterMode(TIM16, LL_TIM_COUNTERMODE_UP);
+    LL_TIM_EnableARRPreload(TIM16);
+    LL_TIM_EnableUpdateEvent(TIM16);
+    LL_TIM_ClearFlag_UPDATE(TIM16);
+    LL_TIM_EnableIT_UPDATE(TIM16);
+
+    NVIC_SetPriority(TIM16_IRQn, 2); // lowest priority: I2C > EXTI > refresh
+    NVIC_EnableIRQ(TIM16_IRQn);
+
+    LL_TIM_EnableCounter(TIM16);
+}
+
 static void APP_BuildGammaLUT(void) {
-    // gamma_lut[i] = round( (i / CHARLIE_PWM_STEPS)^CHARLIE_GAMMA * (CHARLIE_PWM_STEPS - 1) )
-    // powf() runs 13 times total, here at boot, never in the 50ms tick loop —
+    // gamma_lut[i] = round( (i / (CHARLIE_PWM_STEPS-1))^CHARLIE_GAMMA * CHARLIE_PWM_STEPS )
+    // powf() runs once per entry here at boot, never in the 50ms tick loop —
     // that one-time cost is negligible; it's calling pow() every tick that was slow.
     for (uint32_t i = 0; i < GAMMA_LUT_SIZE; i++) {
-        float x = (float)i / (float)CHARLIE_PWM_STEPS;
+        float x = (float)i / (float)(CHARLIE_PWM_STEPS - 1);
         float g = powf(x, CHARLIE_GAMMA);
-        gamma_lut[i] = (uint8_t)(g * (float)(CHARLIE_PWM_STEPS - 1) + 0.5f); // round, not truncate
+        gamma_lut[i] = (uint8_t)(g * (float)CHARLIE_PWM_STEPS + 0.5f); // round, not truncate
     }
 }
 

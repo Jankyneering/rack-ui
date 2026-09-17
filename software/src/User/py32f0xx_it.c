@@ -1,6 +1,7 @@
 #include "py32f0xx_it.h"
 #include "main.h"
 #include "py32f0xx_ll_i2c.h"
+#include "py32f0xx_ll_tim.h"
 
 #define ENCODER_DEBOUNCE_MS 50
 #define BUTTON_DEBOUNCE_MS 50
@@ -45,6 +46,13 @@ void I2C1_IRQHandler(void) {
         } else {
             // Master is READING (Requesting data from the pointer we just set)
             slave_state = I2C_STATE_REG_PTR_SET;
+            // Sample the button level once per read transaction (it only changes on
+            // human timescales) rather than re-reading it for every byte below.
+            if (!LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0)) {
+                device_memory[0x06] |= 0x01;
+            } else {
+                device_memory[0x06] &= ~0x01;
+            }
             // Transmit the first byte immediately
             LL_I2C_TransmitData8(I2C_INSTANCE, device_memory[current_reg_ptr]);
             current_reg_ptr++;
@@ -72,12 +80,7 @@ void I2C1_IRQHandler(void) {
                 }
             }
         } else {
-            // MASTER IS READING
-            if (!LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0)) {
-                device_memory[0x06] |= 0x01;
-            } else {
-                device_memory[0x06] &= ~0x01;
-            }
+            // MASTER IS READING — button level already sampled at ADDR match above.
             if (LL_I2C_IsActiveFlag_TXE(I2C_INSTANCE) || LL_I2C_IsActiveFlag_BTF(I2C_INSTANCE)) {
                 LL_I2C_TransmitData8(I2C_INSTANCE, device_memory[current_reg_ptr]);
                 if (current_reg_ptr == 0x07) {
@@ -128,4 +131,14 @@ void EXTI4_15_IRQHandler(void) {
 
 void SysTick_Handler(void) {
     sys_tick_ms++;
+}
+
+/* Charlieplex refresh: advance the multiplex/PWM state at a fixed cadence
+ * set by APP_Charlie_Timer_Init() (TIM16 update). Runs at a lower priority
+ * than I2C/EXTI so host communication and encoder input never get starved. */
+void TIM16_IRQHandler(void) {
+    if (LL_TIM_IsActiveFlag_UPDATE(TIM16)) {
+        LL_TIM_ClearFlag_UPDATE(TIM16);
+        Charlie_Tick();
+    }
 }

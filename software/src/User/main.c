@@ -89,11 +89,10 @@ int main(void) {
             // }
 
             // Set brightness for all LEDs based on on_count (same gamma value
-            // for every LED, so it only needs to be looked up once per tick).
+            // for every LED, so the whole array is set in one memset rather
+            // than 12 validated Charlie_SetLED() calls).
             uint8_t brightness = gamma_lut[on_count];
-            for (int i = 0; i < CHARLIE_LED_COUNT; i++) {
-                Charlie_SetLED(i, brightness);
-            }
+            Charlie_SetAllLEDs(brightness);
 
             if (!all_on) {
                 if (on_count < CHARLIE_PWM_STEPS) {

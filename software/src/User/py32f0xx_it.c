@@ -80,7 +80,7 @@ void I2C1_IRQHandler(void) {
             }
             if (LL_I2C_IsActiveFlag_TXE(I2C_INSTANCE) || LL_I2C_IsActiveFlag_BTF(I2C_INSTANCE)) {
                 LL_I2C_TransmitData8(I2C_INSTANCE, device_memory[current_reg_ptr]);
-                if (current_reg_ptr == 0x07 && true) {
+                if (current_reg_ptr == 0x07) {
                     device_memory[0x07] = 0x00; // clear after read
                 }
                 current_reg_ptr++;

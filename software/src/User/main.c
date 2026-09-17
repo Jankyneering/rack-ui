@@ -102,6 +102,7 @@ int main(void) {
                 }
                 if (on_count >= CHARLIE_PWM_STEPS) {
                     all_on = true;
+                    on_count--;
                 }
             } else {
                 if (on_count > 0) {

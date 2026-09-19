@@ -36,3 +36,40 @@ jobs:
         with:
           name: firmware
           path: software/src/Build/
+
+  nightly-release:
+    # Publish the firmware built from the tip of main to a rolling "nightly"
+    # release. The release and its tag are recreated on every push, so the
+    # download always matches the latest commit.
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: firmware
+
+      - name: Delete existing nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete nightly --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+
+      - name: Create nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
+          gh release create nightly \
+            --repo "$GITHUB_REPOSITORY" \
+            --prerelease \
+            --title "Nightly build (${SHORT_SHA})" \
+            --notes "Automated firmware build from the tip of \`main\` (commit ${GITHUB_SHA}).
+
+          Contains \`app.bin\` (raw binary for flashing), plus \`app.hex\` and \`app.elf\`. See [software/src/README.md](software/src/README.md) for flashing instructions and the I2C register map."
+            firmware/app.bin firmware/app.hex firmware/app.elf

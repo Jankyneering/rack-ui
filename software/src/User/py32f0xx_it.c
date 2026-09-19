@@ -46,11 +46,11 @@ static void slave_transmit_next(void) {
 
     LL_I2C_TransmitData8(I2C_INSTANCE, device_memory[reg]);
 
-    if (reg == REG_ENC_COUNT_LO && !(device_memory[REG_CONFIG] & CFG_ROT_RESET_DIS)) {
+    if (reg == REG_ENC_COUNT_LO && (device_memory[REG_CONFIG] & CFG_ROT_RESET_ON_READ)) {
         device_memory[REG_ENC_COUNT_HI] = 0;
         device_memory[REG_ENC_COUNT_LO] = 0;
     }
-    if (reg == REG_ENC_PUSH_COUNT && !(device_memory[REG_CONFIG] & CFG_PUSH_RESET_DIS)) {
+    if (reg == REG_ENC_PUSH_COUNT && (device_memory[REG_CONFIG] & CFG_PUSH_RESET_ON_READ)) {
         device_memory[REG_ENC_PUSH_COUNT] = 0;
     }
 

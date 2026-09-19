@@ -53,24 +53,24 @@ starved by the display refresh.
 | --- | --- | --- | --- |
 | `0x00`-`0x01` | R/O | `0x00 0x01` | Firmware version, 16-bit big-endian (BCD-friendly: v0.1 reads `0x0001`). |
 | `0x02` | R/W | `0x00` | Configuration bits, see below. |
-| `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read unless config bit 0 is set. |
-| `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read unless config bit 1 is set. |
+| `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read if config bit 0 is set. |
+| `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
 | `0x06` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
 | `0x07`-`0x0F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
 | `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. |
 | `0x1C`-`0x1F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
-| `0x20`-`0xFF` | R/W | `0x42` | General-purpose I2C RAM. Not used by the firmware; defaults to `0x42` and survives until reset. |
+| `0x20`-`0xFF` | R/W | `0x00` | General-purpose I2C RAM. Not used by the firmware; usable as 224 bytes of host scratch space. |
 
 ### Config register (`0x02`)
 
 | Bit | Default | Description |
 | --- | --- | --- |
-| 0 | `0` | `0` = clear the rotation count (`0x03`-`0x04`) to zero after the low byte is read. `1` = keep the count. |
-| 1 | `0` | `0` = clear the push count (`0x05`) to zero after it is read. `1` = keep the count. |
+| 0 | `0` | `1` = clear the rotation count (`0x03`-`0x04`) to zero after the low byte (`0x04`) is read. `0` (default) = keep the count. |
+| 1 | `0` | `1` = clear the push count (`0x05`) to zero after it is read. `0` (default) = keep the count. |
 | 2 | `0` | `1` = flip encoder increment direction. |
-| 3 | `0` | `1` = decrement push count on press (saturates at 0), `0` = increment (wraps past 255). |
-| 4 | `0` | `1` = invert the reported push button state (`0x06`). |
-| 5 | `0` | `0` = gamma-correct LED brightness, `1` = linear brightness. |
+| 3 | `0` | `1` = decrement push count on press (saturates at 0, e.g. for "count down remaining presses" logic), `0` = increment (wraps past 255). |
+| 4 | `0` | `1` = invert the reported push button state: unpressed reads `1`, pressed reads `0`. |
+| 5 | `0` | `0` = gamma-correct LED brightness (default), `1` = linear brightness. |
 | 6-7 | `0` | Reserved, always read 0. |
 
 Notes:
@@ -88,12 +88,15 @@ Notes:
 # Read the firmware version (expects 0x00 0x01)
 i2ctransfer -y 1 w1@0x36 0x00 r2
 
-# Read the 16-bit encoder rotation count (auto-clears after the read)
+# Read the 16-bit encoder rotation count
 i2ctransfer -y 1 w1@0x36 0x03 r2
 
-# Read the button state and push count (push count auto-clears after the read)
+# Read the button state and push count
 i2cget -y 1 0x36 0x06
 i2cget -y 1 0x36 0x05
+
+# Enable reset-on-read for the rotation count and push count
+i2cset -y 1 0x36 0x02 0x03
 
 # Set LED 0 to quarter brightness and LED 11 to full, gamma-corrected
 i2cset -y 1 0x36 0x10 0x10
@@ -106,7 +109,7 @@ i2ctransfer -y 1 w13@0x36 0x10 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40
 i2cset -y 1 0x36 0x02 0x24
 
 # Use register 0x20 as scratch RAM
-i2cset -y 1 0x36 0x20 0x42
+i2cset -y 1 0x36 0x20 0xA5
 i2cget -y 1 0x36 0x20
 ```
 

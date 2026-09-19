@@ -27,18 +27,20 @@ print(f"FW version: {read_regs(0x00, 2)} (expected [0, 1])")
 set_reg(0x10, 0x20)
 print(f"LED 0 brightness readback: {read_regs(0x10, 1)} (expected [32])")
 
-# 3. General-purpose RAM scratch test
-set_reg(0x20, 0x42)
-print(f"GP RAM readback: {read_regs(0x20, 1)} (expected [66])")
+# 3. General-purpose RAM scratch test (defaults to 0x00)
+set_reg(0x20, 0xA5)
+print(f"GP RAM readback: {read_regs(0x20, 1)} (expected [165])")
 
 # 4. Read-only register: write to 0x00 must be ignored
 set_reg(0x00, 0xFF)
 print(f"FW version after illegal write: {read_regs(0x00, 2)} (expected [0, 1])")
 
-# 5. Encoder rotation count (auto-clears after the low byte is read)
-print(f"Rotation count: {read_regs(0x03, 2)} (auto-clears to [0, 0] on next read)")
+# 5. Encoder rotation count (clears on read only with config bit 0 set)
+set_reg(0x02, 0x03)  # enable reset-on-read for rotation and push counts
+print(f"Rotation count: {read_regs(0x03, 2)} (clears to [0, 0] on next read)")
 print(f"Rotation count after clear: {read_regs(0x03, 2)} (expected [0, 0])")
+set_reg(0x02, 0x00)  # restore defaults
 
 # 6. Push button state and count
 print(f"Push state: {read_regs(0x06, 1)} (0x01 while pressed)")
-print(f"Push count: {read_regs(0x05, 1)} (auto-clears to [0] on next read)")
+print(f"Push count: {read_regs(0x05, 1)} (clears to [0] on next read with bit 1 set)")

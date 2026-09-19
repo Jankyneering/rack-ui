@@ -80,14 +80,14 @@ extern "C" {
 #define REG_LED_COUNT        12   /* 0x10-0x1B */
 /* 0x1C-0x1F: reserved, reads as 0x00, writes ignored */
 #define REG_GP_BASE          0x20 /* R/W: general-purpose I2C RAM */
-#define REG_GP_DEFAULT       0x42
+#define REG_GP_DEFAULT       0x00
 
 /* REG_CONFIG bit definitions */
-#define CFG_ROT_RESET_DIS     (1u << 0) /* 0: reset rotation count after its low byte is read */
-#define CFG_PUSH_RESET_DIS    (1u << 1) /* 0: reset push count after it is read */
-#define CFG_ENC_DIR_FLIP      (1u << 2) /* 1: flip encoder increment direction */
-#define CFG_PUSH_COUNT_DEC    (1u << 3) /* 1: decrement push count on press, 0: increment */
-#define CFG_PUSH_STATE_FLIP   (1u << 4) /* 1: invert reported push button state */
+#define CFG_ROT_RESET_ON_READ  (1u << 0) /* 1: reset rotation count after its low byte is read */
+#define CFG_PUSH_RESET_ON_READ (1u << 1) /* 1: reset push count after it is read */
+#define CFG_ENC_DIR_FLIP       (1u << 2) /* 1: flip encoder increment direction */
+#define CFG_PUSH_COUNT_DEC     (1u << 3) /* 1: decrement push count on press, 0: increment */
+#define CFG_PUSH_STATE_FLIP    (1u << 4) /* 1: invert reported push button state */
 #define CFG_LED_LINEAR         (1u << 5) /* 0: gamma-correct LED brightness, 1: linear */
 /* bits 6-7: reserved, always read 0 */
 

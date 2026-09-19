@@ -32,6 +32,7 @@
 void Charlie_Init(void);
 void Charlie_SetLED(uint8_t led_index, uint8_t brightness); /* 0–CHARLIE_PWM_STEPS, 64 = full on */
 void Charlie_SetAllLEDs(uint8_t brightness);                 /* same value for every LED */
+void Charlie_GammaEnable(bool enable); /* if false, Charlie_SetLED() uses linear brightness instead of gamma-corrected */
 void Charlie_Off(void);
 void Charlie_Tick(void);  /* to refresh state */
 // void charlie_all_hiz(void);

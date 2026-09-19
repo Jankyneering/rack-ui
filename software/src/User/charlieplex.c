@@ -13,6 +13,8 @@ static uint8_t charlie_brightness[CHARLIE_LED_COUNT] = {0}; // 0 means off, max 
  * Built once in APP_BuildGammaLUT() below; the hot loop only indexes it. */
 static uint8_t gamma_lut[GAMMA_LUT_SIZE];
 
+static bool use_gamma = true; // if false, Charlie_SetLED() uses linear brightness instead of gamma-corrected
+
 static const uint32_t charlie_pins[CHARLIE_PIN_COUNT] = {
     CHARLIE_X0,
     CHARLIE_X1,
@@ -118,14 +120,27 @@ void Charlie_Init(void) {
 }
 
 void Charlie_SetLED(uint8_t led_index, uint8_t brightness) {
-    if (led_index >= CHARLIE_LED_COUNT || brightness > CHARLIE_PWM_STEPS)
+    if (led_index >= CHARLIE_LED_COUNT)
         return;
+    if (brightness > CHARLIE_PWM_STEPS)
+        brightness = CHARLIE_PWM_STEPS;
 
-    charlie_brightness[led_index] = gamma_lut[brightness];
+    if (use_gamma)
+        charlie_brightness[led_index] = gamma_lut[brightness];
+    else
+        charlie_brightness[led_index] = brightness;
 }
 
 void Charlie_SetAllLEDs(uint8_t brightness) {
-    memset(charlie_brightness, gamma_lut[brightness], CHARLIE_LED_COUNT);
+    if (brightness > CHARLIE_PWM_STEPS)
+        brightness = CHARLIE_PWM_STEPS;
+    
+    uint8_t value = use_gamma ? gamma_lut[brightness] : brightness;
+    memset(charlie_brightness, value, CHARLIE_LED_COUNT);
+}
+
+void Charlie_GammaEnable(bool enable) {
+    use_gamma = enable;
 }
 
 void Charlie_Off(void) {

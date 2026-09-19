@@ -69,6 +69,8 @@ extern "C" {
 /* Register map */
 #define REG_COUNT            256  /* 0x00-0xFF, one byte each */
 #define REG_FW_VERSION_HI   0x00 /* R/O: firmware version, high byte */
+#define REG_SOFT_RESET      0x00 /* W: command register (same address as version hi):
+                                     writing any non-zero value soft-resets the MCU */
 #define REG_FW_VERSION_LO   0x01 /* R/O: firmware version, low byte */
 #define REG_CONFIG           0x02 /* R/W: configuration bits, default 0x00 */
 #define REG_ENC_COUNT_HI     0x03 /* R/W: encoder rotation count, high byte */
@@ -97,6 +99,7 @@ void APP_ErrorHandler(void);
 void APP_SlaveIRQCallback(void);
 void APP_SlaveIRQCallback_NACK(void);
 void APP_MarkRegsDirty(void);
+void APP_ResetRequest(void);
 
 /* Private defines -----------------------------------------------------------*/
 

@@ -51,7 +51,7 @@ starved by the display refresh.
 
 | Register | Access | Default | Description |
 | --- | --- | --- | --- |
-| `0x00`-`0x01` | R/O | `0x00 0x01` | Firmware version, 16-bit big-endian (BCD-friendly: v0.1 reads `0x0001`). |
+| `0x00`-`0x01` | R/W(see note) | `0x00 0x01` | **Read**: firmware version, 16-bit big-endian (BCD-friendly: v0.1 reads `0x0001`). **Write**: writing any non-zero value to `0x00` issues a soft reset (the version register is not writable; a zero write is ignored). |
 | `0x02` | R/W | `0x00` | Configuration bits, see below. |
 | `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read if config bit 0 is set. |
 | `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
@@ -77,6 +77,9 @@ Notes:
 
 * Writes to read-only registers are ignored (the register pointer still advances, so
   multi-byte writes can skip over them).
+* A soft reset completes the current I2C transaction first, then resets the MCU; the bus
+  release means the master sees a normal STOP rather than a stuck line. After reset, all
+  registers return to their power-on defaults.
 * The rotation counter is big-endian; read `0x03` then `0x04` in one transaction for a
   coherent value.
 * Register defaults are reinitialised only at power-on/reset; the general-purpose RAM is not
@@ -97,6 +100,9 @@ i2cget -y 1 0x36 0x05
 
 # Enable reset-on-read for the rotation count and push count
 i2cset -y 1 0x36 0x02 0x03
+
+# Soft-reset the device (registers return to power-on defaults)
+i2cset -y 1 0x36 0x00 0x01
 
 # Set LED 0 to quarter brightness and LED 11 to full, gamma-corrected
 i2cset -y 1 0x36 0x10 0x10

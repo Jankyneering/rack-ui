@@ -19,7 +19,9 @@ extern __IO I2C_Slave_State_t slave_state;
 
 /* Writable registers: config, encoder counters, LED brightness and the
  * general-purpose RAM area. Everything else (version, push state, reserved)
- * is read-only and master writes are ignored (pointer still advances). */
+ * is read-only and master writes are ignored (pointer still advances).
+ * Register 0x00 is not writable in the normal sense: writing a non-zero
+ * value to it triggers a soft reset, handled in APP_ResetRequest(). */
 static bool reg_is_writable(uint8_t reg) {
     if (reg == REG_CONFIG)
         return true;
@@ -104,7 +106,10 @@ void I2C1_IRQHandler(void) {
             // MASTER IS WRITING
             if (LL_I2C_IsActiveFlag_RXNE(I2C_INSTANCE)) {
                 uint8_t data = LL_I2C_ReceiveData8(I2C_INSTANCE);
-                if (reg_is_writable(current_reg_ptr)) {
+                if (current_reg_ptr == REG_SOFT_RESET) {
+                    if (data != 0x00)
+                        APP_ResetRequest(); // software reset, does not return
+                } else if (reg_is_writable(current_reg_ptr)) {
                     if (current_reg_ptr == REG_CONFIG)
                         data &= 0x3F; // bits 6-7 are reserved
                     device_memory[current_reg_ptr] = data;

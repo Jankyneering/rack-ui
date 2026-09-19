@@ -16,6 +16,11 @@ volatile uint32_t sys_tick_ms       = 0;
  * writes keep latency bounded and ISRs never call Charlie_* functions. */
 static volatile bool regs_dirty = false;
 
+/* Set by the I2C ISR when the master writes a non-zero value to the command
+ * register (0x00). The reset itself runs in the main loop so the current I2C
+ * transaction finishes (STOP seen by the master) before the MCU resets. */
+static volatile bool reset_pending = false;
+
 /* Prototypes */
 static void APP_SystemClockConfig(void);
 static void APP_GPIOConfig(void);
@@ -54,6 +59,9 @@ int main(void) {
     APP_ApplyLedRegisters();
 
     while (1) {
+        if (reset_pending) {
+            NVIC_SystemReset(); // does not return
+        }
         if (regs_dirty) {
             regs_dirty = false;
             APP_ApplyConfig();
@@ -67,6 +75,10 @@ int main(void) {
 
 void APP_MarkRegsDirty(void) {
     regs_dirty = true;
+}
+
+void APP_ResetRequest(void) {
+    reset_pending = true;
 }
 
 static void APP_ApplyConfig(void) {

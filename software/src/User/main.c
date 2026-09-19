@@ -2,27 +2,19 @@
 #include <stddef.h>
 
 /* I2C Configuration */
-#define SLAVE_ADDRESS (0x36 << 1)
+#define SLAVE_ADDRESS (I2C_SLAVE_ADDR << 1)
 #define I2C_SPEEDCLOCK 100000
-#define I2C_STATE_READY 0
-#define I2C_STATE_BUSY_TX 1
-#define I2C_STATE_BUSY_RX 2
-
-/* Register Map Configuration */
-#define REG_COUNT 256
-#define REG_RW_LIMIT 4 // 0x00 to 0x03
-#define REG_RO_LIMIT 8 // 0x04 to 0x07
-#define DEFAULT_VAL 0x42
 
 /* Private variables */
 volatile uint8_t device_memory[REG_COUNT];
 volatile uint8_t current_reg_ptr   = 0;
-__IO I2C_Slave_State_t slave_state = I2C_STATE_IDLE;
+__IO I2C_Slave_State_t slave_state  = I2C_STATE_IDLE;
+volatile uint32_t sys_tick_ms       = 0;
 
-volatile uint32_t sys_tick_ms      = 0;
-uint32_t last_led_update_ms        = 0;
-uint8_t on_count                   = 0;
-bool all_on                        = false;
+/* Set when the master writes to a register that requires the main loop to act
+ * (config or LED brightness). The main loop clears it after applying, so I2C
+ * writes keep latency bounded and ISRs never call Charlie_* functions. */
+static volatile bool regs_dirty = false;
 
 /* Prototypes */
 static void APP_SystemClockConfig(void);
@@ -30,6 +22,8 @@ static void APP_GPIOConfig(void);
 static void APP_I2C_Slave_Init(void);
 static void APP_Encoder_Init(void);
 static void APP_Charlie_Timer_Init(void);
+static void APP_ApplyConfig(void);
+static void APP_ApplyLedRegisters(void);
 
 int main(void) {
     APP_SystemClockConfig();
@@ -42,51 +36,48 @@ int main(void) {
 
     // Initialize memory
     for (int i = 0; i < REG_COUNT; i++) {
-        if (i < REG_RW_LIMIT)
-            device_memory[i] = i + 12; // RW registers get unique values starting from 0x0C
-        else if (i < REG_RO_LIMIT)
-            device_memory[i] = 0x00; // Start RO regs at 0x00
+        if (i >= REG_GP_BASE)
+            device_memory[i] = REG_GP_DEFAULT;
         else
-            device_memory[i] = DEFAULT_VAL; // Everything else is 0x42
+            device_memory[i] = 0x00;
     }
 
+    /* Firmware version, big-endian */
+    device_memory[REG_FW_VERSION_HI] = (uint8_t)(FW_VERSION >> 8);
+    device_memory[REG_FW_VERSION_LO] = (uint8_t)(FW_VERSION & 0xFF);
+
+    /* Push state default: not pushed (bit 0 clear) */
+    device_memory[REG_ENC_PUSH_STATE] = 0x00;
+
+    /* Apply config-dependent display settings once at boot */
+    APP_ApplyConfig();
+    APP_ApplyLedRegisters();
+
     while (1) {
-        if (device_memory[1] == 0xFF) {
-            LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_5); // ON
-            device_memory[0] = 0x55;                      // Update a RO register to show we can write to it internally
-        } else {
-            LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_5); // OFF
-            device_memory[0] = 0xAA;                    // Update the RO register back to its default
+        if (regs_dirty) {
+            regs_dirty = false;
+            APP_ApplyConfig();
+            APP_ApplyLedRegisters();
         }
-        if ((sys_tick_ms - last_led_update_ms) >= 50) {
-            last_led_update_ms = sys_tick_ms;
-
-            // Set brightness for all LEDs based on on_count (same gamma value
-            // for every LED, so the whole array is set in one memset rather
-            // than 12 validated Charlie_SetLED() calls).
-            Charlie_SetAllLEDs(on_count);
-
-            if (!all_on) {
-                if (on_count < CHARLIE_PWM_STEPS) {
-                    on_count++;
-                }
-                if (on_count >= CHARLIE_PWM_STEPS) {
-                    all_on = true;
-                    on_count--;
-                }
-            } else {
-                if (on_count > 0) {
-                    on_count--;
-                }
-                if (on_count == 0) {
-                    all_on = false;
-                }
-            }
-        };
-
         // Charlie_Tick() now runs from the TIM16 update ISR at a fixed cadence;
         // sleep until any interrupt wakes us instead of spinning on the loop.
         __WFI();
+    }
+}
+
+void APP_MarkRegsDirty(void) {
+    regs_dirty = true;
+}
+
+static void APP_ApplyConfig(void) {
+    Charlie_GammaEnable(!(device_memory[REG_CONFIG] & CFG_LED_LINEAR));
+}
+
+/* Push the LED brightness registers (0x10-0x1B) into the charlieplex driver.
+ * Charlie_SetLED() clamps out-of-range values to full on. */
+static void APP_ApplyLedRegisters(void) {
+    for (uint8_t i = 0; i < REG_LED_COUNT; i++) {
+        Charlie_SetLED(i, device_memory[REG_LED_BASE + i]);
     }
 }
 
@@ -110,11 +101,14 @@ static void APP_GPIOConfig(void) {
 
     // PB5 active low LED
     GPIO_InitStruct.Pin        = LL_GPIO_PIN_5;
-    GPIO_InitStruct.Mode       = LL_GPIO_MODE_OUTPUT;
-    GPIO_InitStruct.Speed      = LL_GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Mode      = LL_GPIO_MODE_OUTPUT;
+    GPIO_InitStruct.Speed     = LL_GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-    GPIO_InitStruct.Pull       = LL_GPIO_PULL_NO;
+    GPIO_InitStruct.Pull      = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    // PB5 is active low: drive it high to keep the onboard LED off by default
+    LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_5);
 }
 
 static void APP_I2C_Slave_Init(void) {

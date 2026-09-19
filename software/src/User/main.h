@@ -59,11 +59,44 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
+
+/* Firmware version, exposed big-endian in registers 0x00-0x01 */
+#define FW_VERSION 0x0001u
+
+/* I2C slave address (7-bit) */
+#define I2C_SLAVE_ADDR 0x36
+
+/* Register map */
+#define REG_COUNT            256  /* 0x00-0xFF, one byte each */
+#define REG_FW_VERSION_HI   0x00 /* R/O: firmware version, high byte */
+#define REG_FW_VERSION_LO   0x01 /* R/O: firmware version, low byte */
+#define REG_CONFIG           0x02 /* R/W: configuration bits, default 0x00 */
+#define REG_ENC_COUNT_HI     0x03 /* R/W: encoder rotation count, high byte */
+#define REG_ENC_COUNT_LO     0x04 /* R/W: encoder rotation count, low byte */
+#define REG_ENC_PUSH_COUNT   0x05 /* R/W: encoder push button count */
+#define REG_ENC_PUSH_STATE   0x06 /* R/O: encoder push button state */
+/* 0x07-0x0F: reserved, reads as 0x00, writes ignored */
+#define REG_LED_BASE         0x10 /* R/W: LED brightness, one register per LED */
+#define REG_LED_COUNT        12   /* 0x10-0x1B */
+/* 0x1C-0x1F: reserved, reads as 0x00, writes ignored */
+#define REG_GP_BASE          0x20 /* R/W: general-purpose I2C RAM */
+#define REG_GP_DEFAULT       0x42
+
+/* REG_CONFIG bit definitions */
+#define CFG_ROT_RESET_DIS     (1u << 0) /* 0: reset rotation count after its low byte is read */
+#define CFG_PUSH_RESET_DIS    (1u << 1) /* 0: reset push count after it is read */
+#define CFG_ENC_DIR_FLIP      (1u << 2) /* 1: flip encoder increment direction */
+#define CFG_PUSH_COUNT_DEC    (1u << 3) /* 1: decrement push count on press, 0: increment */
+#define CFG_PUSH_STATE_FLIP   (1u << 4) /* 1: invert reported push button state */
+#define CFG_LED_LINEAR         (1u << 5) /* 0: gamma-correct LED brightness, 1: linear */
+/* bits 6-7: reserved, always read 0 */
+
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions prototypes ---------------------------------------------*/
 void APP_ErrorHandler(void);
 void APP_SlaveIRQCallback(void);
 void APP_SlaveIRQCallback_NACK(void);
+void APP_MarkRegsDirty(void);
 
 /* Private defines -----------------------------------------------------------*/
 

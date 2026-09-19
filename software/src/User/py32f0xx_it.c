@@ -11,13 +11,51 @@ static volatile uint32_t last_button_tick  = 0;
 
 extern volatile uint32_t sys_tick_ms;
 /* External variables from main.c */
-extern volatile uint8_t device_memory[256];
+extern volatile uint8_t device_memory[REG_COUNT];
 extern volatile uint8_t current_reg_ptr;
 extern __IO I2C_Slave_State_t slave_state;
 
 #define I2C_INSTANCE I2C1
-#define REG_RW_LIMIT 4
-#define DEFAULT_VAL 0x42
+
+/* Writable registers: config, encoder counters, LED brightness and the
+ * general-purpose RAM area. Everything else (version, push state, reserved)
+ * is read-only and master writes are ignored (pointer still advances). */
+static bool reg_is_writable(uint8_t reg) {
+    if (reg == REG_CONFIG)
+        return true;
+    if (reg >= REG_ENC_COUNT_HI && reg <= REG_ENC_PUSH_COUNT) // 0x03-0x05
+        return true;
+    if (reg >= REG_LED_BASE && reg < REG_LED_BASE + REG_LED_COUNT) // 0x10-0x1B
+        return true;
+    return reg >= REG_GP_BASE; // 0x20-0xFF
+}
+
+/* Send the byte at the current register pointer and advance it, applying
+ * per-register read side effects:
+ * - push state is sampled live from the pin (with optional inversion)
+ * - rotation count clears after its low byte is read, unless disabled
+ * - push count clears after it is read, unless disabled */
+static void slave_transmit_next(void) {
+    uint8_t reg = current_reg_ptr;
+
+    if (reg == REG_ENC_PUSH_STATE) {
+        bool pressed = !LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0);
+        bool flipped = device_memory[REG_CONFIG] & CFG_PUSH_STATE_FLIP;
+        device_memory[REG_ENC_PUSH_STATE] = (pressed != flipped) ? 0x01 : 0x00;
+    }
+
+    LL_I2C_TransmitData8(I2C_INSTANCE, device_memory[reg]);
+
+    if (reg == REG_ENC_COUNT_LO && !(device_memory[REG_CONFIG] & CFG_ROT_RESET_DIS)) {
+        device_memory[REG_ENC_COUNT_HI] = 0;
+        device_memory[REG_ENC_COUNT_LO] = 0;
+    }
+    if (reg == REG_ENC_PUSH_COUNT && !(device_memory[REG_CONFIG] & CFG_PUSH_RESET_DIS)) {
+        device_memory[REG_ENC_PUSH_COUNT] = 0;
+    }
+
+    current_reg_ptr++; // uint8_t: wraps past 0xFF back to 0x00
+}
 
 void I2C1_IRQHandler(void) {
     // --- 1. ERROR HANDLING ---
@@ -46,16 +84,8 @@ void I2C1_IRQHandler(void) {
         } else {
             // Master is READING (Requesting data from the pointer we just set)
             slave_state = I2C_STATE_REG_PTR_SET;
-            // Sample the button level once per read transaction (it only changes on
-            // human timescales) rather than re-reading it for every byte below.
-            if (!LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0)) {
-                device_memory[0x06] |= 0x01;
-            } else {
-                device_memory[0x06] &= ~0x01;
-            }
             // Transmit the first byte immediately
-            LL_I2C_TransmitData8(I2C_INSTANCE, device_memory[current_reg_ptr]);
-            current_reg_ptr++;
+            slave_transmit_next();
         }
         return; // Exit to allow the next byte to trigger the next interrupt
     }
@@ -70,23 +100,26 @@ void I2C1_IRQHandler(void) {
         break;
 
     case I2C_STATE_REG_PTR_SET:
-        if (LL_I2C_GetTransferDirection(I2C_INSTANCE) == 0) { // fixed: 0 = master writing
+        if (LL_I2C_GetTransferDirection(I2C_INSTANCE) == 0) { // 0 = master writing
             // MASTER IS WRITING
             if (LL_I2C_IsActiveFlag_RXNE(I2C_INSTANCE)) {
                 uint8_t data = LL_I2C_ReceiveData8(I2C_INSTANCE);
-                if (current_reg_ptr < REG_RW_LIMIT) {
+                if (reg_is_writable(current_reg_ptr)) {
+                    if (current_reg_ptr == REG_CONFIG)
+                        data &= 0x3F; // bits 6-7 are reserved
                     device_memory[current_reg_ptr] = data;
-                    current_reg_ptr++; // advance pointer for multi-byte writes
+                    if (current_reg_ptr == REG_CONFIG ||
+                        (current_reg_ptr >= REG_LED_BASE &&
+                         current_reg_ptr < REG_LED_BASE + REG_LED_COUNT)) {
+                        APP_MarkRegsDirty(); // config/LED changes are applied in the main loop
+                    }
                 }
+                current_reg_ptr++; // advance pointer even for ignored writes
             }
         } else {
-            // MASTER IS READING — button level already sampled at ADDR match above.
+            // MASTER IS READING
             if (LL_I2C_IsActiveFlag_TXE(I2C_INSTANCE) || LL_I2C_IsActiveFlag_BTF(I2C_INSTANCE)) {
-                LL_I2C_TransmitData8(I2C_INSTANCE, device_memory[current_reg_ptr]);
-                if (current_reg_ptr == 0x07) {
-                    device_memory[0x07] = 0x00; // clear after read
-                }
-                current_reg_ptr++;
+                slave_transmit_next();
             }
         }
         break;
@@ -101,9 +134,14 @@ void EXTI0_1_IRQHandler(void) {
     if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_0)) {
         LL_EXTI_ClearFlag(LL_EXTI_LINE_0);
         bool button_pressed = !LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0);
-        if ((sys_tick_ms - last_button_tick) >= BUTTON_DEBOUNCE_MS) {
+        if (button_pressed && (sys_tick_ms - last_button_tick) >= BUTTON_DEBOUNCE_MS) {
             last_button_tick = sys_tick_ms;
-            button_pressed ? device_memory[0x07]++ : (void)0; // Increment on press, do nothing on release
+            if (device_memory[REG_CONFIG] & CFG_PUSH_COUNT_DEC) {
+                if (device_memory[REG_ENC_PUSH_COUNT] > 0)
+                    device_memory[REG_ENC_PUSH_COUNT]--; // saturate at 0
+            } else {
+                device_memory[REG_ENC_PUSH_COUNT]++; // wraps past 0xFF
+            }
         }
     }
 }
@@ -117,14 +155,18 @@ void EXTI4_15_IRQHandler(void) {
             last_encoder_tick = sys_tick_ms;
 
             // EncA just transitioned; EncB's level at this instant gives direction.
-            bool enc_b       = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_4) ? 1 : 0;
+            bool enc_b = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_4);
 
-            uint16_t counter = (uint16_t)((device_memory[0x04] << 8) | device_memory[0x05]);
+            int8_t delta = enc_b ? 1 : -1;
+            if (device_memory[REG_CONFIG] & CFG_ENC_DIR_FLIP)
+                delta = -delta;
 
-            enc_b ? counter++ : counter--;
+            int16_t count =
+                (int16_t)((device_memory[REG_ENC_COUNT_HI] << 8) | device_memory[REG_ENC_COUNT_LO]);
+            count += delta;
 
-            device_memory[0x04] = (uint8_t)((counter >> 8) & 0xFF);
-            device_memory[0x05] = (uint8_t)(counter & 0xFF);
+            device_memory[REG_ENC_COUNT_HI] = (uint8_t)((count >> 8) & 0xFF);
+            device_memory[REG_ENC_COUNT_LO] = (uint8_t)(count & 0xFF);
         }
     }
 }

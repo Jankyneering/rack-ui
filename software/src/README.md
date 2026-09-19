@@ -13,12 +13,12 @@ project using the Puya LL (Low Layer) driver library.
   interrupt and exposed through an I2C register map (see below), so a host (e.g. a Raspberry
   Pi or another MCU) can poll the panel without GPIO wiring.
 * **LED driving** - 12 LEDs are driven from 4 GPIO pins by charlieplexing, with 64-step
-  software PWM and gamma correction (curve exponent 2.2, built into a lookup table at boot).
+  software PWM and optional gamma correction (curve exponent 2.2, built into a lookup table
+  at boot; toggle via config bit 5). Per-LED brightness is set through registers `0x10`-`0x1B`.
   The multiplex/PWM refresh is advanced by a TIM16 update interrupt every 24 µs, giving a
   ~54 Hz full-array refresh that is flicker-free. The main loop sleeps in `__WFI()` between
-  interrupts.
-* **Demo behaviour** - out of the box, the LED array runs a "breathing" fade ramp (updated
-  every 50 ms) and register `0x01` controls the onboard status LED.
+  interrupts and applies register writes between them, so I2C transactions are never blocked
+  by display updates.
 
 ## Hardware / pin map
 
@@ -51,34 +51,63 @@ starved by the display refresh.
 
 | Register | Access | Default | Description |
 | --- | --- | --- | --- |
-| `0x00` | R/W | `0xAA` | Status/demo register. Firmware writes `0x55` here while register `0x01` is `0xFF`, otherwise `0xAA`. |
-| `0x01` | R/W | `0x0D` | Onboard LED control (demo). Write `0xFF` to turn the PB5 LED **on**, any other value turns it **off**. |
-| `0x02` | R/W | `0x0E` | Free R/W register. |
-| `0x03` | R/W | `0x0F` | Free R/W register. |
-| `0x04` | R/O | `0x00` | Encoder count, high byte (16-bit, big-endian). |
-| `0x05` | R/O | `0x00` | Encoder count, low byte. Incremented/decremented on rotation. |
-| `0x06` | R/O | `0x00` | Encoder switch state, bit 0 = `1` while pressed. Sampled at the start of each read transaction. |
-| `0x07` | R/O | `0x00` | Debounced button press counter. Incremented on each press; cleared automatically after being read. |
-| `0x08`-`0xFF` | R/O | `0x42` | Unimplemented. Reads return `0x42`; writes are ignored. |
+| `0x00`-`0x01` | R/O | `0x00 0x01` | Firmware version, 16-bit big-endian (BCD-friendly: v0.1 reads `0x0001`). |
+| `0x02` | R/W | `0x00` | Configuration bits, see below. |
+| `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read unless config bit 0 is set. |
+| `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read unless config bit 1 is set. |
+| `0x06` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
+| `0x07`-`0x0F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
+| `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. |
+| `0x1C`-`0x1F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
+| `0x20`-`0xFF` | R/W | `0x42` | General-purpose I2C RAM. Not used by the firmware; defaults to `0x42` and survives until reset. |
+
+### Config register (`0x02`)
+
+| Bit | Default | Description |
+| --- | --- | --- |
+| 0 | `0` | `0` = clear the rotation count (`0x03`-`0x04`) to zero after the low byte is read. `1` = keep the count. |
+| 1 | `0` | `0` = clear the push count (`0x05`) to zero after it is read. `1` = keep the count. |
+| 2 | `0` | `1` = flip encoder increment direction. |
+| 3 | `0` | `1` = decrement push count on press (saturates at 0), `0` = increment (wraps past 255). |
+| 4 | `0` | `1` = invert the reported push button state (`0x06`). |
+| 5 | `0` | `0` = gamma-correct LED brightness, `1` = linear brightness. |
+| 6-7 | `0` | Reserved, always read 0. |
 
 Notes:
 
-* Only registers `0x00`-`0x03` can be written by the master.
-* The encoder counter is stored big-endian, so read `0x04` then `0x05` (with auto-increment)
-  to get a coherent 16-bit value.
+* Writes to read-only registers are ignored (the register pointer still advances, so
+  multi-byte writes can skip over them).
+* The rotation counter is big-endian; read `0x03` then `0x04` in one transaction for a
+  coherent value.
+* Register defaults are reinitialised only at power-on/reset; the general-purpose RAM is not
+  preserved across resets.
 
 ### Examples (Linux `i2c-tools`)
 
 ```bash
-# Turn the onboard LED on
-i2cset -y 1 0x36 0x01 0xFF
+# Read the firmware version (expects 0x00 0x01)
+i2ctransfer -y 1 w1@0x36 0x00 r2
 
-# Read the 16-bit encoder count
-i2ctransfer -y 1 w1@0x36 0x04 r2
+# Read the 16-bit encoder rotation count (auto-clears after the read)
+i2ctransfer -y 1 w1@0x36 0x03 r2
 
-# Read the button state (bit 0) and press counter
+# Read the button state and push count (push count auto-clears after the read)
 i2cget -y 1 0x36 0x06
-i2cget -y 1 0x36 0x07
+i2cget -y 1 0x36 0x05
+
+# Set LED 0 to quarter brightness and LED 11 to full, gamma-corrected
+i2cset -y 1 0x36 0x10 0x10
+i2cset -y 1 0x36 0x1B 0x40
+
+# Set all 12 LED brightness registers in one transaction
+i2ctransfer -y 1 w13@0x36 0x10 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40
+
+# Flip encoder direction and switch LEDs to linear brightness
+i2cset -y 1 0x36 0x02 0x24
+
+# Use register 0x20 as scratch RAM
+i2cset -y 1 0x36 0x20 0x42
+i2cget -y 1 0x36 0x20
 ```
 
 ## Building

@@ -117,7 +117,7 @@ void EXTI4_15_IRQHandler(void) {
             last_encoder_tick = sys_tick_ms;
 
             // EncA just transitioned; EncB's level at this instant gives direction.
-            bool enc_b = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_4) ? 1 : 0;
+            bool enc_b       = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_4) ? 1 : 0;
 
             uint16_t counter = (uint16_t)((device_memory[0x04] << 8) | device_memory[0x05]);
 

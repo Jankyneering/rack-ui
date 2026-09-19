@@ -13,7 +13,7 @@ static uint8_t charlie_brightness[CHARLIE_LED_COUNT] = {0}; // 0 means off, max 
  * Built once in APP_BuildGammaLUT() below; the hot loop only indexes it. */
 static uint8_t gamma_lut[GAMMA_LUT_SIZE];
 
-static bool use_gamma = true; // if false, Charlie_SetLED() uses linear brightness instead of gamma-corrected
+static bool use_gamma                                 = true; // if false, Charlie_SetLED() uses linear brightness instead of gamma-corrected
 
 static const uint32_t charlie_pins[CHARLIE_PIN_COUNT] = {
     CHARLIE_X0,
@@ -63,8 +63,8 @@ static uint8_t charlie_last_state = CHARLIE_OFF_STATE + 1;
 
 static void charlie_build_states(void) {
     for (int led = 0; led < CHARLIE_LED_COUNT; led++) {
-        uint8_t anode      = charlie_map[led][0];
-        uint8_t cathode    = charlie_map[led][1];
+        uint8_t anode        = charlie_map[led][0];
+        uint8_t cathode      = charlie_map[led][1];
         uint32_t active_pins = charlie_pins[anode] | charlie_pins[cathode];
 
         // Active anode+cathode go push-pull (OTYPER bit 0); everything else stays open-drain (bit 1).
@@ -82,8 +82,8 @@ static void charlie_build_luts(void) {
     // powf() runs once per entry here at boot, never in the 50ms tick loop —
     // that one-time cost is negligible; it's calling pow() every tick that was slow.
     for (uint32_t i = 0; i < GAMMA_LUT_SIZE; i++) {
-        float x = (float)i / (float)(CHARLIE_PWM_STEPS - 1);
-        float g = powf(x, CHARLIE_GAMMA);
+        float x      = (float)i / (float)(CHARLIE_PWM_STEPS - 1);
+        float g      = powf(x, CHARLIE_GAMMA);
         gamma_lut[i] = (uint8_t)(g * (float)CHARLIE_PWM_STEPS + 0.5f); // round, not truncate
     }
 }
@@ -91,11 +91,11 @@ static void charlie_build_luts(void) {
 static inline void charlie_apply_state(uint8_t state_index) {
     if (state_index == charlie_last_state)
         return;
-    charlie_last_state = state_index;
+    charlie_last_state       = state_index;
 
     const charlie_state_t *s = &charlie_states[state_index];
-    CHARLIE_GPIO->OTYPER = (CHARLIE_GPIO->OTYPER & ~charlie_all_pins_mask) | s->otyper_bits;
-    CHARLIE_GPIO->ODR    = (CHARLIE_GPIO->ODR & ~charlie_all_pins_mask) | s->odr_bits;
+    CHARLIE_GPIO->OTYPER     = (CHARLIE_GPIO->OTYPER & ~charlie_all_pins_mask) | s->otyper_bits;
+    CHARLIE_GPIO->ODR        = (CHARLIE_GPIO->ODR & ~charlie_all_pins_mask) | s->odr_bits;
 }
 
 static void charlie_all_hiz(void) {
@@ -134,7 +134,7 @@ void Charlie_SetLED(uint8_t led_index, uint8_t brightness) {
 void Charlie_SetAllLEDs(uint8_t brightness) {
     if (brightness > CHARLIE_PWM_STEPS)
         brightness = CHARLIE_PWM_STEPS;
-    
+
     uint8_t value = use_gamma ? gamma_lut[brightness] : brightness;
     memset(charlie_brightness, value, CHARLIE_LED_COUNT);
 }
@@ -147,7 +147,7 @@ void Charlie_Off(void) {
     charlie_all_hiz();
 }
 
-static uint8_t _pwm_step = 0;
+static uint8_t _pwm_step  = 0;
 static uint8_t _led_index = 0;
 
 void Charlie_Tick(void) {

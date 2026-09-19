@@ -61,19 +61,6 @@ int main(void) {
         if ((sys_tick_ms - last_led_update_ms) >= 50) {
             last_led_update_ms = sys_tick_ms;
 
-            // Turn On/off in sequence
-            // if (!all_on) {
-            //     Charlie_SetLED(on_count, 1);
-            // } else {
-            //     Charlie_SetLED(on_count, 0);
-            // }
-
-            // on_count++;
-            // if (on_count >= 12) {
-            //     all_on = !all_on;
-            //     on_count = 0;
-            // }
-
             // Set brightness for all LEDs based on on_count (same gamma value
             // for every LED, so the whole array is set in one memset rather
             // than 12 validated Charlie_SetLED() calls).

@@ -22,20 +22,25 @@ static const uint32_t charlie_pins[CHARLIE_PIN_COUNT] = {
     CHARLIE_X3,
 };
 
+/*
+* Mapping of LED numbers to anode/cathode pin pairs.
+*/
+#if HW_VERSION == 0x0100
 static const uint8_t charlie_map[CHARLIE_LED_COUNT][2] = {
-    {0, 1},
-    {1, 0},
-    {1, 2},
-    {2, 1},
-    {2, 3},
-    {3, 2},
-    {3, 0},
-    {0, 3},
-    {0, 2},
-    {2, 0},
-    {1, 3},
-    {3, 1},
+    {0, 2}, // 0
+    {2, 0}, // 1
+    {1, 3}, // 2
+    {3, 1}, // 3
+    {0, 3}, // 4
+    {3, 0}, // 5
+    {0, 1}, // 6
+    {1, 0}, // 7
+    {1, 2}, // 8
+    {2, 1}, // 9
+    {2, 3}, // 10
+    {3, 2}, // 11
 };
+#endif
 
 /* Bitmask of all charlieplex pins, built once in Charlie_Init().
  * Mode and pull never change after init, so the hot path (called every

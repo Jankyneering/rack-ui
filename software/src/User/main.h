@@ -62,6 +62,7 @@ extern "C" {
 
 /* Firmware version, exposed big-endian in registers 0x00-0x01 */
 #define FW_VERSION 0x0001u
+#define HW_VERSION 0x0100u // hardware version, used for peripheral mapping and other hardware-specific behavior
 
 /* I2C slave address (7-bit) */
 #define I2C_SLAVE_ADDR 0x36

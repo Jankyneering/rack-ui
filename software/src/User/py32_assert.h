@@ -61,4 +61,4 @@ void assert_failed(uint8_t *file, uint32_t line);
 
 #endif /* __PY32_ASSERT_H */
 
-/************************ (C) COPYRIGHT Pyua *****END OF FILE****/
+/************************ (C) COPYRIGHT Puya *****END OF FILE****/

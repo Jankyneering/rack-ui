@@ -15,6 +15,9 @@ project using the Puya LL (Low Layer) driver library.
 * **LED driving** - 12 LEDs are driven from 4 GPIO pins by charlieplexing, with 64-step
   software PWM and optional gamma correction (curve exponent 2.2, built into a lookup table
   at boot; toggle via config bit 5). Per-LED brightness is set through registers `0x10`-`0x1B`.
+  Built-in animations (rotating loading pattern, breathing) can drive the array
+  automatically; select one through register `0x0F`, or set it to IDLE to control the
+  LEDs manually.
   The multiplex/PWM refresh is advanced by a TIM16 update interrupt every 24 µs, giving a
   ~54 Hz full-array refresh that is flicker-free. The main loop sleeps in `__WFI()` between
   interrupts and applies register writes between them, so I2C transactions are never blocked
@@ -56,8 +59,9 @@ starved by the display refresh.
 | `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read if config bit 0 is set. |
 | `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
 | `0x06` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
-| `0x07`-`0x0F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
-| `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. |
+| `0x07`-`0x0E` | R/O | `0x00` | Reserved for future encoder settings. Reads return `0x00`; writes are ignored. |
+| `0x0F` | R/W | `0x01` | Active animation, see [below](#animation-register-0x0f). |
+| `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. In IDLE mode (`0x0F` = `0x00`) these registers drive the LEDs directly; while an animation is running, the animation overwrites them. |
 | `0x1C`-`0x1F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
 | `0x20`-`0xFF` | R/W | `0x00` | General-purpose I2C RAM. Not used by the firmware; usable as 224 bytes of host scratch space. |
 
@@ -84,6 +88,22 @@ Notes:
   coherent value.
 * Register defaults are reinitialised only at power-on/reset; the general-purpose RAM is not
   preserved across resets.
+
+### Animation register (`0x0F`)
+
+Selects the LED animation. New animations are added by extending the table in
+`User/animations.c` (see `User/animations.h` for the ID enum); unknown values fall
+back to `IDLE`.
+
+| Value | Name | Description |
+| --- | --- | --- |
+| `0x00` | `IDLE` | Custom control: the LEDs are driven manually via registers `0x10`-`0x1B`. |
+| `0x01` | `LOADING` | Rotating loading pattern, one LED at a time reaching full brightness. **Default at power-on.** |
+| `0x02` | `BREATHING` | All LEDs smoothly fade in, hold, fade out and pause. |
+
+Animations write their brightness values to the LED registers (`0x10`-`0x1B`) and
+mark them dirty, so the main loop applies them exactly like host writes. The
+animation engine ticks every 11 ms from the main loop.
 
 ### Examples (Linux `i2c-tools`)
 
@@ -113,6 +133,13 @@ i2ctransfer -y 1 w13@0x36 0x10 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40
 
 # Flip encoder direction and switch LEDs to linear brightness
 i2cset -y 1 0x36 0x02 0x24
+
+# Switch to manual LED control (IDLE), then set LED 0 to quarter brightness
+i2cset -y 1 0x36 0x0F 0x00
+i2cset -y 1 0x36 0x10 0x10
+
+# Switch to the breathing animation
+i2cset -y 1 0x36 0x0F 0x02
 
 # Use register 0x20 as scratch RAM
 i2cset -y 1 0x36 0x20 0xA5

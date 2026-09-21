@@ -71,5 +71,5 @@ jobs:
             --title "Nightly build (${SHORT_SHA})" \
             --notes "Automated firmware build from the tip of \`main\` (commit ${GITHUB_SHA}).
 
-          Contains \`app.bin\` (raw binary for flashing), plus \`app.hex\` and \`app.elf\`. See [software/src/README.md](software/src/README.md) for flashing instructions and the I2C register map."
+          Contains \`app.bin\` (raw binary for flashing), plus \`app.hex\` and \`app.elf\`. See [software/src/README.md](software/src/README.md) for flashing instructions and the I2C register map." \
             firmware/app.bin firmware/app.hex firmware/app.elf

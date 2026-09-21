@@ -17,9 +17,6 @@
 extern volatile uint32_t sys_tick_ms;
 extern volatile uint8_t device_memory[REG_COUNT];
 
-/* Animation engine tick, driven from the main loop. */
-#define ANIMATION_TICK_MS 11
-
 typedef void (*Animation_Start_Fn_t)(void);
 typedef void (*Animation_Step_Fn_t)(void);
 
@@ -104,8 +101,6 @@ static void Animation_Idle_Step(void) {
  * This animation lights up each LED in a circular pattern, with each LED
  * reaching maximum brightness before moving to the next.
  */
-#define ANIMATION_LOADING_TICK_MS 100
-
 static uint8_t loading_brightness_lut[ANIMATION_LED_COUNT];
 static uint8_t loading_current_led = 0;
 static uint32_t last_loading_tick = 0;
@@ -148,11 +143,6 @@ typedef enum {
     ANIMATION_BREATHING_PHASE_OUT,
     ANIMATION_BREATHING_PHASE_PAUSE,
 } BreathingPhase_t;
-
-#define ANIMATION_BREATHING_IN_MS 1500
-#define ANIMATION_BREATHING_HOLD_MS 750
-#define ANIMATION_BREATHING_OUT_MS 2500
-#define ANIMATION_BREATHING_PAUSE_MS 2000
 
 static BreathingPhase_t breathing_phase = ANIMATION_BREATHING_PHASE_IN;
 static uint32_t breathing_phase_start_tick = 0;

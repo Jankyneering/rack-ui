@@ -24,14 +24,22 @@ extern "C" {
 
 /* Animation IDs, matching the values written to register 0x0F. */
 typedef enum {
-    ANIMATION_IDLE = 0x00, /* LEDs are driven manually through registers 0x10-0x1B */
-    ANIMATION_LOADING = 0x01, /* rotating loading pattern (default) */
+    ANIMATION_IDLE      = 0x00, /* LEDs are driven manually through registers 0x10-0x1B */
+    ANIMATION_LOADING   = 0x01, /* rotating loading pattern (default) */
     ANIMATION_BREATHING = 0x02, /* all LEDs fade in and out */
     /* Add new animations here, then register them in the animation table in
      * animations.c. */
 } Animation_Id_t;
 
 #define ANIMATION_DEFAULT ANIMATION_LOADING
+
+/* Animation settings. */
+#define ANIMATION_TICK_MS 11              // Animation engine tick, driven from the main loop.
+#define ANIMATION_LOADING_TICK_MS 100     // Time between LED steps in the loading animation.
+#define ANIMATION_BREATHING_IN_MS 1500    // Time for LEDs to fade in during the breathing animation.
+#define ANIMATION_BREATHING_HOLD_MS 750   // Time to hold full brightness during the breathing animation.
+#define ANIMATION_BREATHING_OUT_MS 2500   // Time for LEDs to fade out during the breathing animation.
+#define ANIMATION_BREATHING_PAUSE_MS 2000 // Time to pause between breathing cycles.
 
 /* Number of LEDs driven by the animations (register 0x10-0x1B). */
 #define ANIMATION_LED_COUNT 12

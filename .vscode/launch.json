@@ -1,0 +1,33 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug PY32 (auto server)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "external",
+            "gdbTarget": "localhost:3333",
+            "armToolchainPath": "/opt/local/bin/arm-none-eabi-gcc",
+            "executable": "${workspaceFolder}/software/src/Build/app.elf",
+            "svdFile": "${workspaceFolder}/software/src/Misc/SVD/py32f002axx.svd",
+            "cwd": "${workspaceFolder}/software/src",
+            "runToEntryPoint": "Reset_Handler",
+            "preLaunchTask": "build-and-server",
+            "showDevDebugOutput": "parsed"
+        },
+        {
+            "name": "Debug PY32 (managed pyOCD)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "pyocd",
+            "interface": "swd",
+            "cwd": "${workspaceFolder}/software/src",
+            "executable": "${workspaceFolder}/software/src/Build/app.elf",
+            "svdFile": "${workspaceFolder}/software/src/Misc/SVD/py32f002axx.svd",
+            "serverArgs": ["--target", "PY32F002Ax5"],
+            "runToEntryPoint": "Reset_Handler",
+            "preLaunchTask": "build",
+            "showDevDebugOutput": "parsed"
+        }
+    ]
+}

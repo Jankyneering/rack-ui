@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "PY32F002A",
+            "includePath": [
+                "${workspaceFolder}/software/src/User",
+                "${workspaceFolder}/software/src/Libraries/CMSIS/Core/Include",
+                "${workspaceFolder}/software/src/Libraries/CMSIS/Device/PY32F0xx/Include",
+                "${workspaceFolder}/software/src/Libraries/PY32F0xx_LL_Driver/Inc",
+                "${workspaceFolder}/software/src/Libraries/PY32F0xx_LL_BSP/Inc"
+            ],
+            "defines": [
+                "PY32F002Ax5",
+                "USE_FULL_LL_DRIVER"
+            ],
+            "compilerPath": "/opt/local/bin/arm-none-eabi-gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

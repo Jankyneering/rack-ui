@@ -1,0 +1,61 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "make",
+            "args": ["-j"],
+            "options": { "cwd": "${workspaceFolder}/software/src" },
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "make",
+            "args": ["clean"],
+            "options": { "cwd": "${workspaceFolder}/software/src" },
+            "problemMatcher": []
+        },
+        {
+            "label": "flash",
+            "type": "shell",
+            "command": "make",
+            "args": ["flash"],
+            "options": { "cwd": "${workspaceFolder}/software/src" },
+            "problemMatcher": []
+        },
+        {
+            "label": "build-and-server",
+            "dependsOn": ["build", "pyocd-server"],
+            "dependsOrder": "sequence"
+        },
+        {
+            "label": "pyocd-server",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "-c",
+                "if nc -z localhost 3333 2>/dev/null; then echo \"pyOCD server already running on :3333\"; else pyocd gdbserver --target PY32F002Ax5 --persist; fi"
+            ],
+            "options": { "cwd": "${workspaceFolder}/software/src" },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "pyocd",
+                "pattern": { "regexp": "^a^" },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^(Waiting for a debug probe|.*[Ee]rror)",
+                    "endsPattern": "GDB server listening on port|pyOCD server already running"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "debug",
+                "clear": true
+            }
+        }
+    ]
+}

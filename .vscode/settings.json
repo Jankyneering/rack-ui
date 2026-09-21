@@ -1,0 +1,46 @@
+{
+    "files.associations": {
+        "*.ejs": "html",
+        "*.erd": "json",
+        "*.vuerd": "json",
+        "py32f0xx_hal.h": "c"
+    },
+    "cmake.ignoreCMakeListsMissing": true,
+    "actionButtons": {
+        "reloadButton": null,
+        "loadNpmCommands": false,
+        "commands": [
+            {
+                "name": "$(play) Build",
+                "singleInstance": true,
+                "color": "#af565c",
+                "command": "workbench.action.tasks.build",
+                "useVsCodeApi": true
+            },
+            {
+                "name": "$(debug-alt) Debug PY32",
+                "singleInstance": true,
+                "color": "#4ec94e",
+                "command": "workbench.action.debug.start",
+                "useVsCodeApi": true
+            }
+        ]
+    },
+    "cortex-debug.variableUseNaturalFormat": true,
+    "cSpell.words": [
+        "CLKSOURCE",
+        "DUTYCYCLE",
+        "EXTI",
+        "GPIOA",
+        "GPIOB",
+        "HSISYS",
+        "luts",
+        "NVIC",
+        "OPENDRAIN",
+        "OTYPER",
+        "PERIPH",
+        "PORTA",
+        "Puya",
+        "SYSCLK"
+    ]
+}

@@ -14678,7 +14678,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C109410"
+		(property "LCSC" "C9136"
 			(at 44.45 39.37 0)
 			(hide yes)
 			(show_name no)
@@ -14689,7 +14689,7 @@
 				)
 			)
 		)
-		(property "LCSC Part" "C109410"
+		(property "LCSC Part" "C9136"
 			(at 44.45 39.37 0)
 			(hide yes)
 			(show_name no)

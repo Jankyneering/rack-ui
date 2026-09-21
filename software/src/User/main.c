@@ -223,6 +223,7 @@ static void APP_Encoder_Init(void) {
 static void APP_BuildLUTs(void) {
     // Build a simple linear LUT for the loading animation brightnesses
     for (uint8_t i = 1; i < REG_LED_COUNT; i++) {
+        // Calculate the brightness for each LED in the loading animation
         loadingBrightnessesLUT[i] = (uint8_t)(((uint16_t)(i+1) * CHARLIE_PWM_STEPS) / REG_LED_COUNT-1);
     }
 }
@@ -258,8 +259,8 @@ static void APP_Charlie_Timer_Init(void) {
 #define ANIMATION_TICK_MS 11
 typedef enum {
     ANIMATION_STATE_IDLE,
-    ANIMATION_STATE_BREATHING,
     ANIMATION_STATE_LOADING,
+    ANIMATION_STATE_BREATHING,
 } AnimationState_t;
 
 static AnimationState_t animation_state = ANIMATION_STATE_IDLE;
@@ -274,11 +275,11 @@ static void APP_DoAnimations(void) {
                 device_memory[REG_LED_BASE + 11] = CHARLIE_PWM_STEPS / 2; // LED0 half brightness
                 APP_MarkRegsDirty();
                 break;
-            case ANIMATION_STATE_BREATHING:
-                ANIMATION_Breathe();
-                break;
             case ANIMATION_STATE_LOADING:
                 ANIMATION_Loading();
+                break;
+            case ANIMATION_STATE_BREATHING:
+                ANIMATION_Breathe();
                 break;
             default:
                 // Unknown state, do nothing
@@ -288,7 +289,34 @@ static void APP_DoAnimations(void) {
 }
 
 /**
+ * @brief Perform a rotating loading animation on the Charlieplex LEDs.
+ * This animation lights up each LED in a circular pattern, with each LED
+ * reaching maximum brightness before moving to the next.
+ */
+#define ANIMATION_LOADING_TICK_MS 100
+
+static uint32_t last_loading_tick = 0;
+static uint8_t current_led = 0;
+static void ANIMATION_Loading(void) {
+    if ((sys_tick_ms - last_loading_tick) >= ANIMATION_LOADING_TICK_MS) {
+        last_loading_tick = sys_tick_ms;
+
+        current_led = (current_led + 1) % REG_LED_COUNT;
+
+        // Apply the calculated brightnesses to all LEDs
+        for (uint8_t i = 0; i < REG_LED_COUNT; i++) {
+            uint8_t led_index = (current_led + i) % REG_LED_COUNT;
+            device_memory[REG_LED_BASE + led_index] = loadingBrightnessesLUT[i];
+        }
+
+        // Mark the registers as dirty so that the main loop applies the changes
+        APP_MarkRegsDirty();
+    }
+}
+
+/**
  * @brief Perform a breathing animation on the Charlieplex LEDs.
+ * This animation smoothly increases and decreases the brightness of all LEDs.
  */
 typedef enum {
     ANIMATION_BREATHING_PHASE_IN,
@@ -372,28 +400,6 @@ static void ANIMATION_Breathe(void) {
 
     // Mark the registers as dirty so that the main loop applies the changes
     APP_MarkRegsDirty();
-}
-
-// Rotating loading animation: light up each LED from max brightness in a circular pattern. (Led0=Max, led1=max-MAX/amountLEDs,..., shifted by one each tick)
-#define ANIMATION_LOADING_TICK_MS 100
-
-static uint32_t last_loading_tick = 0;
-static uint8_t current_led = 0;
-static void ANIMATION_Loading(void) {
-    if ((sys_tick_ms - last_loading_tick) >= ANIMATION_LOADING_TICK_MS) {
-        last_loading_tick = sys_tick_ms;
-
-        current_led = (current_led + 1) % REG_LED_COUNT;
-
-        // Apply the calculated brightnesses to all LEDs
-        for (uint8_t i = 0; i < REG_LED_COUNT; i++) {
-            uint8_t led_index = (current_led + i) % REG_LED_COUNT;
-            device_memory[REG_LED_BASE + led_index] = loadingBrightnessesLUT[i];
-        }
-
-        // Mark the registers as dirty so that the main loop applies the changes
-        APP_MarkRegsDirty();
-    }
 }
 
 

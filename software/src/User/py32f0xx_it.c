@@ -5,15 +5,10 @@
 #include "py32f0xx_ll_tim.h"
 
 /* The encoder lines each have a 100 nF capacitor to ground, so contact bounce
- * is suppressed by the RC filter formed with the internal pull-ups and only a
- * small software guard against spurious triggers is needed. Keep the window
- * well below the shortest edge gap at hand-rotation speed or ticks get
- * dropped. Toggle mode sees twice the edges, so it uses half the window. */
-#ifdef ENCODER_TRIGGER_TOGGLE
-#define ENCODER_DEBOUNCE_MS 2
-#else
-#define ENCODER_DEBOUNCE_MS 5
-#endif
+ * is suppressed by the RC filter formed with the internal pull-ups; the guard
+ * below is only a glitch filter and must stay well below the shortest edge
+ * gap at hand-rotation speed or ticks get dropped. */
+#define ENCODER_DEBOUNCE_MS 1
 #define BUTTON_DEBOUNCE_MS 50
 
 static volatile uint32_t last_encoder_tick = 0;
@@ -170,6 +165,7 @@ void EXTI4_15_IRQHandler(void) {
     if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_5)) {
         LL_EXTI_ClearFlag(LL_EXTI_LINE_5);
 
+        // 1 ms glitch guard only; real debounce is the RC filter (see above).
         if ((sys_tick_ms - last_encoder_tick) >= ENCODER_DEBOUNCE_MS) {
             last_encoder_tick = sys_tick_ms;
 

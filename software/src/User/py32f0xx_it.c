@@ -1,4 +1,5 @@
 #include "py32f0xx_it.h"
+#include "animations.h"
 #include "main.h"
 #include "py32f0xx_ll_i2c.h"
 #include "py32f0xx_ll_tim.h"
@@ -26,6 +27,8 @@ static bool reg_is_writable(uint8_t reg) {
     if (reg == REG_CONFIG)
         return true;
     if (reg >= REG_ENC_COUNT_HI && reg <= REG_ENC_PUSH_COUNT) // 0x03-0x05
+        return true;
+    if (reg == REG_ANIMATION) // 0x07
         return true;
     if (reg >= REG_LED_BASE && reg < REG_LED_BASE + REG_LED_COUNT) // 0x10-0x1B
         return true;
@@ -118,6 +121,8 @@ void I2C1_IRQHandler(void) {
                          current_reg_ptr < REG_LED_BASE + REG_LED_COUNT)) {
                         APP_MarkRegsDirty(); // config/LED changes are applied in the main loop
                     }
+                    if (current_reg_ptr == REG_ANIMATION)
+                        Animations_Set(data); // switch the active animation
                 }
                 current_reg_ptr++; // advance pointer even for ignored writes
             }

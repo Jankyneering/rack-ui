@@ -1,4 +1,5 @@
 #include "main.h"
+#include "animations.h"
 #include <stddef.h>
 
 /* I2C Configuration */
@@ -26,26 +27,19 @@ static void APP_SystemClockConfig(void);
 static void APP_GPIOConfig(void);
 static void APP_I2C_Slave_Init(void);
 static void APP_Encoder_Init(void);
-static void APP_BuildLUTs(void);
 static void APP_Charlie_Timer_Init(void);
 static void APP_ApplyConfig(void);
 static void APP_ApplyLedRegisters(void);
-static void APP_DoAnimations(void);
-static void ANIMATION_Breathe(void);
-static void ANIMATION_Loading(void);
-
-/* LUTs */
-static uint8_t loadingBrightnessesLUT[REG_LED_COUNT];
 
 int main(void) {
     APP_SystemClockConfig();
     APP_GPIOConfig();
     APP_I2C_Slave_Init();
     APP_Encoder_Init();
-    APP_BuildLUTs();
 
     Charlie_Init();
     APP_Charlie_Timer_Init();
+    Animations_Init();
 
     // Initialize memory
     for (int i = 0; i < REG_COUNT; i++) {
@@ -62,6 +56,9 @@ int main(void) {
     /* Push state default: not pushed (bit 0 clear) */
     device_memory[REG_ENC_PUSH_STATE] = 0x00;
 
+    /* Active animation, exposed in register 0x07 */
+    device_memory[REG_ANIMATION] = Animations_Get();
+
     /* Apply config-dependent display settings once at boot */
     APP_ApplyConfig();
     APP_ApplyLedRegisters();
@@ -77,7 +74,7 @@ int main(void) {
         }
         // Charlie_Tick() now runs from the TIM16 update ISR at a fixed cadence;
         // sleep until any interrupt wakes us instead of spinning on the loop.
-        APP_DoAnimations();
+        Animations_Tick();
         __WFI();
     }
 }
@@ -220,14 +217,6 @@ static void APP_Encoder_Init(void) {
     NVIC_EnableIRQ(EXTI4_15_IRQn);
 }
 
-static void APP_BuildLUTs(void) {
-    // Build a simple linear LUT for the loading animation brightnesses
-    for (uint8_t i = 1; i < REG_LED_COUNT; i++) {
-        // Calculate the brightness for each LED in the loading animation
-        loadingBrightnessesLUT[i] = (uint8_t)(((uint16_t)(i+1) * CHARLIE_PWM_STEPS) / REG_LED_COUNT-1);
-    }
-}
-
 /* Charlieplex refresh timer. The main loop used to spin-call Charlie_Tick()
  * unconditionally, which pinned the CPU at 100% and tied PWM timing to loop
  * iteration count. TIM16 now fires a periodic update interrupt that advances
@@ -252,154 +241,6 @@ static void APP_Charlie_Timer_Init(void) {
     NVIC_EnableIRQ(TIM16_IRQn);
 
     LL_TIM_EnableCounter(TIM16);
-}
-
-
-/* Do animation updates. This is called from the main loop at a fixed interval. */
-#define ANIMATION_TICK_MS 11
-typedef enum {
-    ANIMATION_STATE_IDLE,
-    ANIMATION_STATE_LOADING,
-    ANIMATION_STATE_BREATHING,
-} AnimationState_t;
-
-static AnimationState_t animation_state = ANIMATION_STATE_IDLE;
-static uint32_t last_animation_tick = 0;
-
-static void APP_DoAnimations(void) {
-    if ((sys_tick_ms - last_animation_tick) >= ANIMATION_TICK_MS) {
-        last_animation_tick = sys_tick_ms;
-
-        switch (animation_state) {
-            case ANIMATION_STATE_IDLE:
-                device_memory[REG_LED_BASE + 11] = CHARLIE_PWM_STEPS / 2; // LED0 half brightness
-                APP_MarkRegsDirty();
-                break;
-            case ANIMATION_STATE_LOADING:
-                ANIMATION_Loading();
-                break;
-            case ANIMATION_STATE_BREATHING:
-                ANIMATION_Breathe();
-                break;
-            default:
-                // Unknown state, do nothing
-                break;
-        }
-    }
-}
-
-/**
- * @brief Perform a rotating loading animation on the Charlieplex LEDs.
- * This animation lights up each LED in a circular pattern, with each LED
- * reaching maximum brightness before moving to the next.
- */
-#define ANIMATION_LOADING_TICK_MS 100
-
-static uint32_t last_loading_tick = 0;
-static uint8_t current_led = 0;
-static void ANIMATION_Loading(void) {
-    if ((sys_tick_ms - last_loading_tick) >= ANIMATION_LOADING_TICK_MS) {
-        last_loading_tick = sys_tick_ms;
-
-        current_led = (current_led + 1) % REG_LED_COUNT;
-
-        // Apply the calculated brightnesses to all LEDs
-        for (uint8_t i = 0; i < REG_LED_COUNT; i++) {
-            uint8_t led_index = (current_led + i) % REG_LED_COUNT;
-            device_memory[REG_LED_BASE + led_index] = loadingBrightnessesLUT[i];
-        }
-
-        // Mark the registers as dirty so that the main loop applies the changes
-        APP_MarkRegsDirty();
-    }
-}
-
-/**
- * @brief Perform a breathing animation on the Charlieplex LEDs.
- * This animation smoothly increases and decreases the brightness of all LEDs.
- */
-typedef enum {
-    ANIMATION_BREATHING_PHASE_IN,
-    ANIMATION_BREATHING_PHASE_HOLD,
-    ANIMATION_BREATHING_PHASE_OUT,
-    ANIMATION_BREATHING_PHASE_PAUSE,
-} BreathingPhase_t;
-#define ANIMATION_BREATHING_IN_MS 1500
-#define ANIMATION_BREATHING_HOLD_MS 750
-#define ANIMATION_BREATHING_OUT_MS 2500
-#define ANIMATION_BREATHING_PAUSE_MS 2000
-
-static void ANIMATION_Breathe(void) {
-    static BreathingPhase_t phase = ANIMATION_BREATHING_PHASE_IN;
-    static uint32_t phase_start_tick = 0;
-
-    uint32_t elapsed = sys_tick_ms - phase_start_tick;
-
-    switch (phase) {
-        case ANIMATION_BREATHING_PHASE_IN:
-            if (elapsed >= ANIMATION_BREATHING_IN_MS) {
-                phase = ANIMATION_BREATHING_PHASE_HOLD;
-                phase_start_tick = sys_tick_ms;
-                elapsed = 0;
-            }
-            break;
-        case ANIMATION_BREATHING_PHASE_HOLD:
-            if (elapsed >= ANIMATION_BREATHING_HOLD_MS) {
-                phase = ANIMATION_BREATHING_PHASE_OUT;
-                phase_start_tick = sys_tick_ms;
-                elapsed = 0;
-            }
-            break;
-        case ANIMATION_BREATHING_PHASE_OUT:
-            if (elapsed >= ANIMATION_BREATHING_OUT_MS) {
-                phase = ANIMATION_BREATHING_PHASE_PAUSE;
-                phase_start_tick = sys_tick_ms;
-                elapsed = 0;
-            }
-            break;
-        case ANIMATION_BREATHING_PHASE_PAUSE:
-            if (elapsed >= ANIMATION_BREATHING_PAUSE_MS) {
-                phase = ANIMATION_BREATHING_PHASE_IN;
-                phase_start_tick = sys_tick_ms;
-                elapsed = 0;
-            }
-            break;
-        default:
-            // Unknown phase, reset to IN
-            phase = ANIMATION_BREATHING_PHASE_IN;
-            phase_start_tick = sys_tick_ms;
-            elapsed = 0;
-            break;
-    }
-
-    // Calculate brightness based on the current phase and elapsed time
-    uint8_t brightness = 0;
-
-    switch (phase) {
-        case ANIMATION_BREATHING_PHASE_IN:
-            brightness = (uint8_t)((elapsed * CHARLIE_PWM_STEPS) / ANIMATION_BREATHING_IN_MS);
-            break;
-        case ANIMATION_BREATHING_PHASE_HOLD:
-            brightness = CHARLIE_PWM_STEPS; // Full brightness
-            break;
-        case ANIMATION_BREATHING_PHASE_OUT:
-            brightness = (uint8_t)(CHARLIE_PWM_STEPS - ((elapsed * CHARLIE_PWM_STEPS) / ANIMATION_BREATHING_OUT_MS));
-            break;
-        case ANIMATION_BREATHING_PHASE_PAUSE:
-            brightness = 0; // Off
-            break;
-        default:
-            brightness = 0; // Default to off
-            break;
-    }
-
-    // Apply the calculated brightness to all LEDs
-    for (uint8_t i = 0; i < REG_LED_COUNT; i++) {
-        device_memory[REG_LED_BASE + i] = brightness;
-    }
-
-    // Mark the registers as dirty so that the main loop applies the changes
-    APP_MarkRegsDirty();
 }
 
 

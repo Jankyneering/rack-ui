@@ -3,7 +3,7 @@
  * @file    animations.c
  * @brief   LED animation engine for the Charlieplex LEDs.
  *
- * The active animation is selected through register 0x07 (REG_ANIMATION):
+ * The active animation is selected through register 0x0F (REG_ANIMATION):
  *   0x00 = IDLE     : custom control over the LEDs via registers 0x10-0x1B
  *   0x01 = LOADING  : rotating loading animation (default)
  *   0x02 = BREATHING: all LEDs smoothly fade in and out
@@ -23,7 +23,7 @@ extern volatile uint8_t device_memory[REG_COUNT];
 typedef void (*Animation_Start_Fn_t)(void);
 typedef void (*Animation_Step_Fn_t)(void);
 
-/* One entry per animation exposed through register 0x07. To add a new
+/* One entry per animation exposed through register 0x0F. To add a new
  * animation: give it an ID in Animation_Id_t, implement its start/step
  * functions and append an entry here. */
 typedef struct {

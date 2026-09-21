@@ -28,7 +28,7 @@ static bool reg_is_writable(uint8_t reg) {
         return true;
     if (reg >= REG_ENC_COUNT_HI && reg <= REG_ENC_PUSH_COUNT) // 0x03-0x05
         return true;
-    if (reg == REG_ANIMATION) // 0x07
+    if (reg == REG_ANIMATION) // 0x0F
         return true;
     if (reg >= REG_LED_BASE && reg < REG_LED_BASE + REG_LED_COUNT) // 0x10-0x1B
         return true;

@@ -56,7 +56,7 @@ int main(void) {
     /* Push state default: not pushed (bit 0 clear) */
     device_memory[REG_ENC_PUSH_STATE] = 0x00;
 
-    /* Active animation, exposed in register 0x07 */
+    /* Active animation, exposed in register 0x0F */
     device_memory[REG_ANIMATION] = Animations_Get();
 
     /* Apply config-dependent display settings once at boot */

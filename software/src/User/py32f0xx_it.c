@@ -4,7 +4,13 @@
 #include "py32f0xx_ll_i2c.h"
 #include "py32f0xx_ll_tim.h"
 
+#ifdef ENCODER_TRIGGER_TOGGLE
+/* Both-edge trigger fires twice per detent, so halve the debounce window to
+ * keep the same maximum rotation speed as falling-edge-only mode. */
+#define ENCODER_DEBOUNCE_MS 25
+#else
 #define ENCODER_DEBOUNCE_MS 50
+#endif
 #define BUTTON_DEBOUNCE_MS 50
 
 static volatile uint32_t last_encoder_tick = 0;
@@ -167,7 +173,15 @@ void EXTI4_15_IRQHandler(void) {
             // EncA just transitioned; EncB's level at this instant gives direction.
             bool enc_b = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_4);
 
+#ifdef ENCODER_TRIGGER_TOGGLE
+            /* On a rising EncA edge EncB's level means the opposite of what it
+             * does on a falling edge, so the decode must account for which edge
+             * fired; sampling EncA's new level tells us. */
+            bool enc_a = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_5);
+            int8_t delta = (enc_a == enc_b) ? -1 : 1;
+#else
             int8_t delta = enc_b ? 1 : -1;
+#endif
             if (device_memory[REG_CONFIG] & CFG_ENC_DIR_FLIP)
                 delta = -delta;
 

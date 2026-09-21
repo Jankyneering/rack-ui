@@ -7,7 +7,7 @@
             "request": "launch",
             "servertype": "external",
             "gdbTarget": "localhost:3333",
-            "armToolchainPath": "/opt/local/bin/arm-none-eabi-gcc",
+            "armToolchainPath": "/opt/local/bin/",
             "executable": "${workspaceFolder}/software/src/Build/app.elf",
             "svdFile": "${workspaceFolder}/software/src/Misc/SVD/py32f002axx.svd",
             "cwd": "${workspaceFolder}/software/src",

@@ -29,7 +29,7 @@ project using the Puya LL (Low Layer) driver library.
 | --- | --- | --- |
 | I2C SDA | PA2 | AF12, open-drain, pull-up, 100 kHz |
 | I2C SCL | PA3 | AF12, open-drain, pull-up, 100 kHz |
-| Encoder A | PA5 | EXTI falling edge, triggers count update (50 ms debounce) |
+| Encoder A | PA5 | EXTI edge(s) per `ENCODER_TRIGGER_TOGGLE`, triggers count update (50 ms debounce) |
 | Encoder B | PA4 | Input, sampled to determine rotation direction |
 | Encoder switch | PA0 | EXTI both edges, debounced press counter (50 ms) |
 | LED charlieplex X0 | PA6 | 12 LEDs across 4 pins |
@@ -174,6 +174,10 @@ Useful variants:
 make clean                        # remove build products
 V=1 make                          # verbose output (prints full command lines)
 ```
+
+To count both EncA edges instead of the falling edge only (for encoders that produce
+one edge per detent), define `ENCODER_TRIGGER_TOGGLE` in `User/main.h`; comment the
+`#define` out to restore falling-edge-only counting.
 
 Output files land in `software/src/Build/`:
 

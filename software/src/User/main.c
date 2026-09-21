@@ -190,13 +190,20 @@ static void APP_Encoder_Init(void) {
     GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    // Configure EXTI for PA5 (EncA) — trigger on falling edge to detect rotation;
+    // Configure EXTI for PA5 (EncA) to detect rotation;
     // direction is read from EncB's level at the moment EncA transitions.
+    // ENCODER_TRIGGER_TOGGLE counts both edges (one tick per detent on encoders
+    // that produce one EncA edge per detent); the default falling-edge-only mode
+    // gives one tick per two detents on such encoders.
     LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
-    EXTI_InitStruct.Line                = LL_EXTI_LINE_5;
-    EXTI_InitStruct.LineCommand         = ENABLE;
-    EXTI_InitStruct.Mode                = LL_EXTI_MODE_IT;
-    EXTI_InitStruct.Trigger             = LL_EXTI_TRIGGER_FALLING;
+    EXTI_InitStruct.Line        = LL_EXTI_LINE_5;
+    EXTI_InitStruct.LineCommand = ENABLE;
+    EXTI_InitStruct.Mode        = LL_EXTI_MODE_IT;
+#ifdef ENCODER_TRIGGER_TOGGLE
+    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING_FALLING;
+#else
+    EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_FALLING;
+#endif
     LL_EXTI_Init(&EXTI_InitStruct);
 
     // Configure EXTI for PA0 (EncSW) — trigger on both edges to detect press/release

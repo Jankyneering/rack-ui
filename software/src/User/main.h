@@ -97,6 +97,13 @@ extern "C" {
 #define CFG_LED_LINEAR         (1u << 5) /* 0: gamma-correct LED brightness, 1: linear */
 /* bits 6-7: reserved, always read 0 */
 
+/* Encoder trigger mode:
+ * undefined - count on EncA falling edge only (1 tick per 2 detents on encoders
+ *             with one full quadrature cycle per detent)
+ * defined   - count on both EncA edges (1 tick per detent on encoders with one
+ *             EncA edge per detent, e.g. 36-detent parts showing only 18 ticks) */
+#define ENCODER_TRIGGER_TOGGLE
+
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions prototypes ---------------------------------------------*/
 void APP_ErrorHandler(void);

@@ -4,12 +4,15 @@
 #include "py32f0xx_ll_i2c.h"
 #include "py32f0xx_ll_tim.h"
 
+/* The encoder lines each have a 100 nF capacitor to ground, so contact bounce
+ * is suppressed by the RC filter formed with the internal pull-ups and only a
+ * small software guard against spurious triggers is needed. Keep the window
+ * well below the shortest edge gap at hand-rotation speed or ticks get
+ * dropped. Toggle mode sees twice the edges, so it uses half the window. */
 #ifdef ENCODER_TRIGGER_TOGGLE
-/* Both-edge trigger fires twice per detent, so halve the debounce window to
- * keep the same maximum rotation speed as falling-edge-only mode. */
-#define ENCODER_DEBOUNCE_MS 25
+#define ENCODER_DEBOUNCE_MS 2
 #else
-#define ENCODER_DEBOUNCE_MS 50
+#define ENCODER_DEBOUNCE_MS 5
 #endif
 #define BUTTON_DEBOUNCE_MS 50
 

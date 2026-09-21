@@ -35,10 +35,6 @@ fp-info-cache
 *.dsn
 *.ses
 
-# Exported BOM files
-*.xml
-*.csv
-
 # Archived Backups (KiCad 6.0)
 **/*-backups/*.zip
 
@@ -47,3 +43,8 @@ fp-info-cache
 
 # Local project settings
 *.kicad_prl
+hardware/rack-ui-pcb/rack-ui-pcb.round-tracks-config
+hardware/rack-ui-pcb/place_footprints.log
+.gitignore
+hardware/rack-ui-pcb/fabrication-toolkit-options.json
+hardware/rack-ui-pcb/place_footprints.ini

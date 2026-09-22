@@ -9,8 +9,8 @@
 /* Private variables */
 volatile uint8_t device_memory[REG_COUNT];
 volatile uint8_t current_reg_ptr   = 0;
-__IO I2C_Slave_State_t slave_state  = I2C_STATE_IDLE;
-volatile uint32_t sys_tick_ms       = 0;
+__IO I2C_Slave_State_t slave_state = I2C_STATE_IDLE;
+volatile uint32_t sys_tick_ms      = 0;
 
 /* Set when the master writes to a register that requires the main loop to act
  * (config or LED brightness). The main loop clears it after applying, so I2C
@@ -56,8 +56,9 @@ int main(void) {
     /* Push state default: not pushed (bit 0 clear) */
     device_memory[REG_ENC_PUSH_STATE] = 0x00;
 
-    /* Active animation, exposed in register 0x0F */
-    device_memory[REG_ANIMATION] = Animations_Get();
+    /* Active animation and its timing setting, exposed in registers 0x0E-0x0F */
+    device_memory[REG_ANIMATION]          = Animations_Get();
+    device_memory[REG_ANIMATION_SETTINGS] = Animations_GetSettings();
 
     /* Apply config-dependent display settings once at boot */
     APP_ApplyConfig();
@@ -119,10 +120,10 @@ static void APP_GPIOConfig(void) {
 
     // PB5 active low LED
     GPIO_InitStruct.Pin        = LL_GPIO_PIN_5;
-    GPIO_InitStruct.Mode      = LL_GPIO_MODE_OUTPUT;
-    GPIO_InitStruct.Speed     = LL_GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Mode       = LL_GPIO_MODE_OUTPUT;
+    GPIO_InitStruct.Speed      = LL_GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-    GPIO_InitStruct.Pull      = LL_GPIO_PULL_NO;
+    GPIO_InitStruct.Pull       = LL_GPIO_PULL_NO;
     LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     // PB5 is active low: drive it high to keep the onboard LED off by default
@@ -197,9 +198,9 @@ static void APP_Encoder_Init(void) {
     // gives one tick per two detents on such encoders. The ENC_A_* macros follow
     // ENCODER_AB_SWAP, so the trigger moves with the swapped phase.
     LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
-    EXTI_InitStruct.Line        = ENC_A_EXTI_LINE;
-    EXTI_InitStruct.LineCommand = ENABLE;
-    EXTI_InitStruct.Mode        = LL_EXTI_MODE_IT;
+    EXTI_InitStruct.Line                = ENC_A_EXTI_LINE;
+    EXTI_InitStruct.LineCommand         = ENABLE;
+    EXTI_InitStruct.Mode                = LL_EXTI_MODE_IT;
 #ifdef ENCODER_TRIGGER_TOGGLE
     EXTI_InitStruct.Trigger = LL_EXTI_TRIGGER_RISING_FALLING;
 #else
@@ -250,7 +251,6 @@ static void APP_Charlie_Timer_Init(void) {
 
     LL_TIM_EnableCounter(TIM16);
 }
-
 
 void APP_ErrorHandler(void) {
     while (1)

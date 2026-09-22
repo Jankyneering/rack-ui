@@ -3,10 +3,14 @@
  * @file    animations.h
  * @brief   LED animation engine for the Charlieplex LEDs.
  *
- * The active animation is selected through register 0x0F (REG_ANIMATION):
+ * The active animation is selected through register 0x0E (REG_ANIMATION):
  *   0x00 = IDLE     : custom control over the LEDs via registers 0x10-0x1B
- *   0x01 = LOADING  : rotating loading animation (default)
- *   0x02 = BREATHING: all LEDs smoothly fade in and out
+ *   0x01 = LOADING  : rotating loading animation
+ *   0x02 = FLASHING : all LEDs flash on and off
+ *   0x03 = PULSING  : all LEDs pulse in brightness
+ *   0x04 = BREATHING: all LEDs smoothly fade in and out
+ * Register 0x0F (REG_ANIMATION_SETTINGS) holds the timing setting of the
+ *   selected animation; writing REG_ANIMATION loads that animation's default.
  *   ...add new animations by extending Animation_Id_t and the table in
  *   animations.c.
  ******************************************************************************
@@ -22,10 +26,10 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-/* Animation IDs, matching the values written to register 0x0F. */
+/* Animation IDs, matching the values written to register 0x0E. */
 typedef enum {
     ANIMATION_IDLE      = 0x00, /* LEDs are driven manually through registers 0x10-0x1B */
-    ANIMATION_LOADING   = 0x01, /* rotating loading pattern (default) */
+    ANIMATION_LOADING   = 0x01, /* rotating loading pattern */
     ANIMATION_FLASHING  = 0x02, /* all LEDs flash on and off */
     ANIMATION_PULSING   = 0x03, /* all LEDs pulse in brightness */
     ANIMATION_BREATHING = 0x04, /* all LEDs fade in and out */
@@ -33,17 +37,36 @@ typedef enum {
     ANIMATION_FOLLOWING = 0x80, /* LEDs follow the encoder rotation (one LED per detent) */
     ANIMATION_POINT     = 0x81, /* one LED lights up at a time, moving with the encoder rotation */
     ANIMATION_GAUGE     = 0x82, /* LEDs light up in a gauge pattern based on the encoder rotation */
+
+    ANIMATION_ALL_ON    = 0xFE, /* all LEDs on at the brightness set through 0x0F (power-on default) */
+    ANIMATION_ALL_OFF   = 0xFF, /* all LEDs off */
     /* Add new animations here, then register them in the animation table in
      * animations.c. */
 } Animation_Id_t;
 
-#define ANIMATION_DEFAULT ANIMATION_PULSING
+#define ANIMATION_DEFAULT ANIMATION_ALL_ON
 
 /* Animation settings. */
-#define ANIMATION_TICK_MS 11              // Animation engine tick, driven from the main loop.
-#define ANIMATION_LOADING_TICK_MS 100     // Time between LED steps in the loading animation.
-#define ANIMATION_FLASHING_TICK_MS 250    // Time between LED state toggles in the flashing animation.
-#define ANIMATION_PULSING_TICK_MS 10     // Time between LED brightness changes in the pulsing animation.
+#define ANIMATION_TICK_MS 11 // Animation engine tick, driven from the main loop.
+
+/* Defaults loaded into register 0x0F (REG_ANIMATION_SETTINGS) when the
+ * matching animation is selected through register 0x0E. The register value
+ * is the animation's setting: 0-255, the timing in tens of milliseconds for
+ * LOADING and FLASHING, in milliseconds for PULSING, the brightness for
+ * ALL_ON, and the off-state brightness of the non-lit LEDs for FOLLOWING and
+ * POINT. A value of 0 keeps the previous setting. */
+#define ANIMATION_LOADING_SETTINGS_DEFAULT 10                   // 10 * 10 ms = 100 ms between LED steps.
+#define ANIMATION_FLASHING_SETTINGS_DEFAULT 25                  // 25 * 10 ms = 250 ms between LED state toggles.
+#define ANIMATION_PULSING_SETTINGS_DEFAULT 10                   // 10 ms between LED brightness changes.
+#define ANIMATION_ALL_ON_SETTINGS_DEFAULT CHARLIE_PWM_STEPS - 1 // Brightness of all LEDs (values above full-on clamp).
+#define ANIMATION_FOLLOWING_SETTINGS_DEFAULT 0                  // Off-state brightness of the non-lit LEDs.
+#define ANIMATION_POINT_SETTINGS_DEFAULT 0                      // Off-state brightness of the non-lit LEDs.
+
+/* Animation settings register scaling, in ms per register step. */
+#define ANIMATION_LOADING_SETTINGS_MS 10
+#define ANIMATION_FLASHING_SETTINGS_MS 10
+#define ANIMATION_PULSING_SETTINGS_MS 1
+
 #define ANIMATION_BREATHING_IN_MS 1500    // Time for LEDs to fade in during the breathing animation.
 #define ANIMATION_BREATHING_HOLD_MS 750   // Time to hold full brightness during the breathing animation.
 #define ANIMATION_BREATHING_OUT_MS 2500   // Time for LEDs to fade out during the breathing animation.
@@ -58,11 +81,19 @@ typedef enum {
 /* Called once at boot to initialize the animation engine. */
 void Animations_Init(void);
 
-/* Select the active animation. Unknown values fall back to ANIMATION_IDLE. */
+/* Select the active animation. Unknown values fall back to ANIMATION_IDLE.
+ * Loading a new animation also loads its default timing setting. */
 void Animations_Set(uint8_t id);
 
-/* Current animation value, as exposed in register 0x0F. */
+/* Update the timing setting of the current animation. A value of 0 keeps
+ * the current setting; ignored for animations without a timing setting. */
+void Animations_SetSettings(uint8_t settings);
+
+/* Current animation value, as exposed in register 0x0E. */
 uint8_t Animations_Get(void);
+
+/* Timing setting of the current animation, as exposed in register 0x0F. */
+uint8_t Animations_GetSettings(void);
 
 /* Advance the active animation. Called from the main loop at a fixed
  * interval; the engine keeps its own tick timing internally. */

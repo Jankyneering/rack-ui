@@ -3,10 +3,12 @@
  * @file    animations.c
  * @brief   LED animation engine for the Charlieplex LEDs.
  *
- * The active animation is selected through register 0x0F (REG_ANIMATION):
+ * The active animation is selected through register 0x0E (REG_ANIMATION):
  *   0x00 = IDLE     : custom control over the LEDs via registers 0x10-0x1B
- *   0x01 = LOADING  : rotating loading animation (default)
- *   0x02 = BREATHING: all LEDs smoothly fade in and out
+ *   0x01 = LOADING  : rotating loading animation
+ *   0x02 = FLASHING : all LEDs flash on and off
+ * Register 0x0F (REG_ANIMATION_SETTINGS) holds the timing setting of the
+ *   selected animation; writing REG_ANIMATION loads that animation's default.
  ******************************************************************************
  */
 
@@ -20,7 +22,7 @@ extern volatile uint8_t device_memory[REG_COUNT];
 typedef void (*Animation_Start_Fn_t)(void);
 typedef void (*Animation_Step_Fn_t)(void);
 
-/* One entry per animation exposed through register 0x0F. To add a new
+/* One entry per animation exposed through register 0x0E. To add a new
  * animation: give it an ID in Animation_Id_t, implement its start/step
  * functions and append an entry here. */
 typedef struct {
@@ -28,6 +30,11 @@ typedef struct {
     Animation_Start_Fn_t start;
     Animation_Step_Fn_t step;
 } Animation_Entry_t;
+
+/* Timing setting (register 0x0F) of the active animation and its scale, in ms
+ * per register step. A scale of 0 means the register is ignored. */
+static uint8_t animation_settings    = 0;
+static uint8_t animation_settings_ms = 0;
 
 static const Animation_Entry_t *Animation_Find(uint8_t id);
 static void Animation_Idle_Start(void);
@@ -48,6 +55,11 @@ static void Animation_Point_Step(void);
 static void Animation_Gauge_Start(void);
 static void Animation_Gauge_Step(void);
 
+static void Animation_All_On_Start(void);
+static void Animation_All_On_Step(void);
+static void Animation_All_Off_Start(void);
+static void Animation_All_Off_Step(void);
+
 static const Animation_Entry_t animation_table[] = {
     {ANIMATION_IDLE, Animation_Idle_Start, Animation_Idle_Step},
     {ANIMATION_LOADING, Animation_Loading_Start, Animation_Loading_Step},
@@ -58,26 +70,92 @@ static const Animation_Entry_t animation_table[] = {
     {ANIMATION_FOLLOWING, Animation_Following_Start, Animation_Following_Step},
     {ANIMATION_POINT, Animation_Point_Start, Animation_Point_Step},
     {ANIMATION_GAUGE, Animation_Gauge_Start, Animation_Gauge_Step},
+    {ANIMATION_ALL_ON, Animation_All_On_Start, Animation_All_On_Step},
+    {ANIMATION_ALL_OFF, Animation_All_Off_Start, Animation_All_Off_Step},
 };
 
 static const Animation_Entry_t *active_animation = &animation_table[0];
-static uint8_t current_id = ANIMATION_IDLE;
+static uint8_t current_id                        = ANIMATION_IDLE;
+
+/* Default timing setting (register 0x0F) for a given animation id: the value
+ * written to REG_ANIMATION_SETTINGS when the animation is selected. */
+static uint8_t Animation_SettingsDefault(uint8_t id) {
+    switch (id) {
+    case ANIMATION_LOADING:
+        return ANIMATION_LOADING_SETTINGS_DEFAULT;
+    case ANIMATION_FLASHING:
+        return ANIMATION_FLASHING_SETTINGS_DEFAULT;
+    case ANIMATION_PULSING:
+        return ANIMATION_PULSING_SETTINGS_DEFAULT;
+    case ANIMATION_ALL_ON:
+        return ANIMATION_ALL_ON_SETTINGS_DEFAULT;
+    case ANIMATION_FOLLOWING:
+        return ANIMATION_FOLLOWING_SETTINGS_DEFAULT;
+    case ANIMATION_POINT:
+        return ANIMATION_POINT_SETTINGS_DEFAULT;
+    default:
+        return 0;
+    }
+}
+
+static uint8_t Animation_SettingsMs(uint8_t id) {
+    switch (id) {
+    case ANIMATION_LOADING:
+        return ANIMATION_LOADING_SETTINGS_MS;
+    case ANIMATION_FLASHING:
+        return ANIMATION_FLASHING_SETTINGS_MS;
+    case ANIMATION_PULSING:
+        return ANIMATION_PULSING_SETTINGS_MS;
+    default:
+        return 0;
+    }
+}
+
+static uint32_t Animation_SettingsTickMs(void) {
+    return (uint32_t)animation_settings * animation_settings_ms;
+}
 
 void Animations_Init(void) {
-    current_id = ANIMATION_DEFAULT;
-    active_animation = Animation_Find(ANIMATION_DEFAULT);
+    current_id                            = ANIMATION_DEFAULT;
+    active_animation                      = Animation_Find(ANIMATION_DEFAULT);
+    animation_settings                    = Animation_SettingsDefault(current_id);
+    animation_settings_ms                 = Animation_SettingsMs(current_id);
+    device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
     active_animation->start();
 }
 
 void Animations_Set(uint8_t id) {
     const Animation_Entry_t *entry = Animation_Find(id);
-    current_id = id;
+    current_id                     = id;
     if (entry == NULL)
         entry = Animation_Find(ANIMATION_IDLE); // unknown value: fall back to IDLE
     if (entry != active_animation) {
         active_animation = entry;
         entry->start();
     }
+    animation_settings                    = Animation_SettingsDefault(id);
+    animation_settings_ms                 = Animation_SettingsMs(id);
+    device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
+}
+
+void Animations_SetSettings(uint8_t settings) {
+    if (settings == 0) {
+        // 0 keeps the current setting; undo the ISR's register write
+        device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
+        return;
+    }
+    animation_settings                    = settings;
+    device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
+    if (current_id == ANIMATION_ALL_ON) {
+        for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+            device_memory[REG_LED_BASE + i] = animation_settings;
+        }
+        APP_MarkRegsDirty();
+    }
+}
+
+uint8_t Animations_GetSettings(void) {
+    return animation_settings;
 }
 
 uint8_t Animations_Get(void) {
@@ -122,7 +200,7 @@ static void Animation_Idle_Step(void) {
  */
 static uint8_t loading_brightness_lut[ANIMATION_LED_COUNT];
 static uint8_t loading_current_led = 0;
-static uint32_t last_loading_tick = 0;
+static uint32_t last_loading_tick  = 0;
 
 static void Animation_Loading_Start(void) {
     // Build a simple linear LUT for the loading animation brightnesses
@@ -132,18 +210,19 @@ static void Animation_Loading_Start(void) {
             (uint8_t)(((uint16_t)(i + 1) * CHARLIE_PWM_STEPS) / ANIMATION_LED_COUNT - 1);
     }
     loading_current_led = 0;
-    last_loading_tick = sys_tick_ms;
+    last_loading_tick   = sys_tick_ms;
 }
 
 static void Animation_Loading_Step(void) {
-    if ((sys_tick_ms - last_loading_tick) >= ANIMATION_LOADING_TICK_MS) {
-        last_loading_tick = sys_tick_ms;
+    uint32_t tick_ms = Animation_SettingsTickMs();
+    if (tick_ms > 0 && (sys_tick_ms - last_loading_tick) >= tick_ms) {
+        last_loading_tick   = sys_tick_ms;
 
         loading_current_led = (loading_current_led + 1) % ANIMATION_LED_COUNT;
 
         // Apply the calculated brightnesses to all LEDs
         for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
-            uint8_t led_index = (loading_current_led + i) % ANIMATION_LED_COUNT;
+            uint8_t led_index                       = (loading_current_led + i) % ANIMATION_LED_COUNT;
             device_memory[REG_LED_BASE + led_index] = loading_brightness_lut[i];
         }
 
@@ -157,22 +236,23 @@ static void Animation_Loading_Step(void) {
  * This animation makes all LEDs flash on and off in a synchronized manner.
  */
 static uint32_t last_flashing_tick = 0;
-static bool flashing_state = false;
+static bool flashing_state         = false;
 
 static void Animation_Flashing_Start(void) {
-    flashing_state = 0;
+    flashing_state     = 0;
     last_flashing_tick = sys_tick_ms;
 }
 
 static void Animation_Flashing_Step(void) {
-    if ((sys_tick_ms - last_flashing_tick) >= ANIMATION_FLASHING_TICK_MS) {
+    uint32_t tick_ms = Animation_SettingsTickMs();
+    if (tick_ms > 0 && (sys_tick_ms - last_flashing_tick) >= tick_ms) {
         last_flashing_tick = sys_tick_ms;
 
-        flashing_state = !flashing_state;
+        flashing_state     = !flashing_state;
 
         // Apply the flashing state to all LEDs
         for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
-            device_memory[REG_LED_BASE + i] = flashing_state ? CHARLIE_PWM_STEPS-1 : 0;
+            device_memory[REG_LED_BASE + i] = flashing_state ? CHARLIE_PWM_STEPS - 1 : 0;
         }
 
         // Mark the registers as dirty so that the main loop applies the changes
@@ -186,16 +266,17 @@ static void Animation_Flashing_Step(void) {
  */
 static uint32_t last_pulsing_tick = 0;
 static uint8_t pulsing_brightness = 0;
-static int8_t pulsing_direction = 1;
+static int8_t pulsing_direction   = 1;
 
 static void Animation_Pulsing_Start(void) {
     pulsing_brightness = 0;
-    pulsing_direction = 1;
-    last_pulsing_tick = sys_tick_ms;
+    pulsing_direction  = 1;
+    last_pulsing_tick  = sys_tick_ms;
 }
 
 static void Animation_Pulsing_Step(void) {
-    if ((sys_tick_ms - last_pulsing_tick) >= ANIMATION_PULSING_TICK_MS) {
+    uint32_t tick_ms = Animation_SettingsTickMs();
+    if (tick_ms > 0 && (sys_tick_ms - last_pulsing_tick) >= tick_ms) {
         last_pulsing_tick = sys_tick_ms;
 
         // Update the brightness
@@ -204,10 +285,10 @@ static void Animation_Pulsing_Step(void) {
         // Change direction if we reach the limits
         if (pulsing_brightness >= CHARLIE_PWM_STEPS - 1) {
             pulsing_brightness = CHARLIE_PWM_STEPS - 1;
-            pulsing_direction = -1;
+            pulsing_direction  = -1;
         } else if (pulsing_brightness <= 0) {
             pulsing_brightness = 0;
-            pulsing_direction = 1;
+            pulsing_direction  = 1;
         }
 
         // Apply the current brightness to all LEDs
@@ -220,7 +301,6 @@ static void Animation_Pulsing_Step(void) {
     }
 }
 
-
 /**
  * @brief Perform a breathing animation on the Charlieplex LEDs.
  * This animation smoothly increases and decreases the brightness of all LEDs.
@@ -232,11 +312,11 @@ typedef enum {
     ANIMATION_BREATHING_PHASE_PAUSE,
 } BreathingPhase_t;
 
-static BreathingPhase_t breathing_phase = ANIMATION_BREATHING_PHASE_IN;
+static BreathingPhase_t breathing_phase    = ANIMATION_BREATHING_PHASE_IN;
 static uint32_t breathing_phase_start_tick = 0;
 
 static void Animation_Breathing_Start(void) {
-    breathing_phase = ANIMATION_BREATHING_PHASE_IN;
+    breathing_phase            = ANIMATION_BREATHING_PHASE_IN;
     breathing_phase_start_tick = sys_tick_ms;
 }
 
@@ -244,63 +324,63 @@ static void Animation_Breathing_Step(void) {
     uint32_t elapsed = sys_tick_ms - breathing_phase_start_tick;
 
     switch (breathing_phase) {
-        case ANIMATION_BREATHING_PHASE_IN:
-            if (elapsed >= ANIMATION_BREATHING_IN_MS) {
-                breathing_phase = ANIMATION_BREATHING_PHASE_HOLD;
-                breathing_phase_start_tick = sys_tick_ms;
-                elapsed = 0;
-            }
-            break;
-        case ANIMATION_BREATHING_PHASE_HOLD:
-            if (elapsed >= ANIMATION_BREATHING_HOLD_MS) {
-                breathing_phase = ANIMATION_BREATHING_PHASE_OUT;
-                breathing_phase_start_tick = sys_tick_ms;
-                elapsed = 0;
-            }
-            break;
-        case ANIMATION_BREATHING_PHASE_OUT:
-            if (elapsed >= ANIMATION_BREATHING_OUT_MS) {
-                breathing_phase = ANIMATION_BREATHING_PHASE_PAUSE;
-                breathing_phase_start_tick = sys_tick_ms;
-                elapsed = 0;
-            }
-            break;
-        case ANIMATION_BREATHING_PHASE_PAUSE:
-            if (elapsed >= ANIMATION_BREATHING_PAUSE_MS) {
-                breathing_phase = ANIMATION_BREATHING_PHASE_IN;
-                breathing_phase_start_tick = sys_tick_ms;
-                elapsed = 0;
-            }
-            break;
-        default:
-            // Unknown phase, reset to IN
-            breathing_phase = ANIMATION_BREATHING_PHASE_IN;
+    case ANIMATION_BREATHING_PHASE_IN:
+        if (elapsed >= ANIMATION_BREATHING_IN_MS) {
+            breathing_phase            = ANIMATION_BREATHING_PHASE_HOLD;
             breathing_phase_start_tick = sys_tick_ms;
-            elapsed = 0;
-            break;
+            elapsed                    = 0;
+        }
+        break;
+    case ANIMATION_BREATHING_PHASE_HOLD:
+        if (elapsed >= ANIMATION_BREATHING_HOLD_MS) {
+            breathing_phase            = ANIMATION_BREATHING_PHASE_OUT;
+            breathing_phase_start_tick = sys_tick_ms;
+            elapsed                    = 0;
+        }
+        break;
+    case ANIMATION_BREATHING_PHASE_OUT:
+        if (elapsed >= ANIMATION_BREATHING_OUT_MS) {
+            breathing_phase            = ANIMATION_BREATHING_PHASE_PAUSE;
+            breathing_phase_start_tick = sys_tick_ms;
+            elapsed                    = 0;
+        }
+        break;
+    case ANIMATION_BREATHING_PHASE_PAUSE:
+        if (elapsed >= ANIMATION_BREATHING_PAUSE_MS) {
+            breathing_phase            = ANIMATION_BREATHING_PHASE_IN;
+            breathing_phase_start_tick = sys_tick_ms;
+            elapsed                    = 0;
+        }
+        break;
+    default:
+        // Unknown phase, reset to IN
+        breathing_phase            = ANIMATION_BREATHING_PHASE_IN;
+        breathing_phase_start_tick = sys_tick_ms;
+        elapsed                    = 0;
+        break;
     }
 
     // Calculate brightness based on the current phase and elapsed time
     uint8_t brightness = 0;
 
     switch (breathing_phase) {
-        case ANIMATION_BREATHING_PHASE_IN:
-            brightness = (uint8_t)((elapsed * CHARLIE_PWM_STEPS) / ANIMATION_BREATHING_IN_MS);
-            break;
-        case ANIMATION_BREATHING_PHASE_HOLD:
-            brightness = CHARLIE_PWM_STEPS; // Full brightness
-            break;
-        case ANIMATION_BREATHING_PHASE_OUT:
-            brightness =
-                (uint8_t)(CHARLIE_PWM_STEPS -
-                          ((elapsed * CHARLIE_PWM_STEPS) / ANIMATION_BREATHING_OUT_MS));
-            break;
-        case ANIMATION_BREATHING_PHASE_PAUSE:
-            brightness = 0; // Off
-            break;
-        default:
-            brightness = 0; // Default to off
-            break;
+    case ANIMATION_BREATHING_PHASE_IN:
+        brightness = (uint8_t)((elapsed * CHARLIE_PWM_STEPS) / ANIMATION_BREATHING_IN_MS);
+        break;
+    case ANIMATION_BREATHING_PHASE_HOLD:
+        brightness = CHARLIE_PWM_STEPS; // Full brightness
+        break;
+    case ANIMATION_BREATHING_PHASE_OUT:
+        brightness =
+            (uint8_t)(CHARLIE_PWM_STEPS -
+                      ((elapsed * CHARLIE_PWM_STEPS) / ANIMATION_BREATHING_OUT_MS));
+        break;
+    case ANIMATION_BREATHING_PHASE_PAUSE:
+        brightness = 0; // Off
+        break;
+    default:
+        brightness = 0; // Default to off
+        break;
     }
 
     // Apply the calculated brightness to all LEDs
@@ -325,9 +405,10 @@ static void Animation_Following_Start(void) {
 static void Animation_Following_Step(void) {
     // Get the current encoder rotation count
     int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
-    // Set LED states
+    // Set LED states; the animation setting (register 0x0F) is the brightness
+    // of the LEDs that are not lit
     for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
-        device_memory[REG_LED_BASE + i] = (i-rotation_count)%ANIMATION_FOLLOWING_LED_STEPS == 0 ? CHARLIE_PWM_STEPS-1 : 0; // Light up every third LED
+        device_memory[REG_LED_BASE + i] = (i - rotation_count) % ANIMATION_FOLLOWING_LED_STEPS == 0 ? CHARLIE_PWM_STEPS - 1 : animation_settings; // Light up every third LED
     }
     // Mark the registers as dirty so that the main loop applies the changes
     APP_MarkRegsDirty();
@@ -344,9 +425,10 @@ static void Animation_Point_Start(void) {
 static void Animation_Point_Step(void) {
     // Get the current encoder rotation count
     int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
-    // Set LED states
+    // Set LED states; the animation setting (register 0x0F) is the brightness
+    // of the LEDs that are not lit
     for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
-        device_memory[REG_LED_BASE + i] = (i-rotation_count)%CHARLIE_LED_COUNT == 0 ? CHARLIE_PWM_STEPS-1 : 0;
+        device_memory[REG_LED_BASE + i] = (i - rotation_count) % CHARLIE_LED_COUNT == 0 ? CHARLIE_PWM_STEPS - 1 : animation_settings;
     }
     // Mark the registers as dirty so that the main loop applies the changes
     APP_MarkRegsDirty();
@@ -362,14 +444,14 @@ static void Animation_Gauge_Start(void) {
     device_memory[REG_ENC_COUNT_HI] = 0x00;
     device_memory[REG_ENC_COUNT_LO] = 0x00;
 
-    last_gauge_tick = sys_tick_ms;
+    last_gauge_tick                 = sys_tick_ms;
 }
 
 static void Animation_Gauge_Step(void) {
     if ((sys_tick_ms - last_gauge_tick) < 50) // Update every 50ms
         return;
     last_gauge_tick = sys_tick_ms;
-    
+
     // Get the current encoder rotation count
     int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
 
@@ -384,29 +466,58 @@ static void Animation_Gauge_Step(void) {
         // clamp device_memory[REG_ENC_COUNT_HI] and device_memory[REG_ENC_COUNT_LO] to 100
         device_memory[REG_ENC_COUNT_HI] = (uint8_t)((rotation_count >> 8) & 0xFF);
         device_memory[REG_ENC_COUNT_LO] = (uint8_t)(rotation_count & 0xFF);
-    } 
+    }
 
     // calculate the brightness for each LED based on the percentage
     // each LED represents ~8.33% of the gauge, each LED maps to a range of 0-8.33% of the total percentage
     for (uint8_t i = 0; i < ANIMATION_GAUGE_LED_COUNT; i++) {
         // calculate the percentage range for this LED
         float led_percentage_start = (i * 100.0f) / ANIMATION_GAUGE_LED_COUNT;
-        float led_percentage_end = ((i + 1) * 100.0f) / ANIMATION_GAUGE_LED_COUNT;
+        float led_percentage_end   = ((i + 1) * 100.0f) / ANIMATION_GAUGE_LED_COUNT;
 
         if (rotation_count >= led_percentage_end) {
             // LED is fully lit
-            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED)%CHARLIE_LED_COUNT] = CHARLIE_PWM_STEPS - 1;
+            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED) % CHARLIE_LED_COUNT] = CHARLIE_PWM_STEPS - 1;
         } else if (rotation_count <= led_percentage_start) {
             // LED is off
-            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED)%CHARLIE_LED_COUNT] = 0;
+            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED) % CHARLIE_LED_COUNT] = 0;
         } else {
             // LED is partially lit, calculate brightness based on the percentage
-            float led_range = led_percentage_end - led_percentage_start;
-            float led_brightness_percentage = (rotation_count - led_percentage_start) / led_range;
-            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED)%CHARLIE_LED_COUNT] = (uint8_t)(led_brightness_percentage * (CHARLIE_PWM_STEPS - 1));
+            float led_range                                                                   = led_percentage_end - led_percentage_start;
+            float led_brightness_percentage                                                   = (rotation_count - led_percentage_start) / led_range;
+            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED) % CHARLIE_LED_COUNT] = (uint8_t)(led_brightness_percentage * (CHARLIE_PWM_STEPS - 1));
         }
     }
 
     // Mark the registers as dirty so that the main loop applies the changes
+    APP_MarkRegsDirty();
+}
+
+/**
+ * @brief Turn all LEDs on at set brightness.
+ * The brightness is the animation setting (register 0x0F).
+ */
+static void Animation_All_On_Start(void) {
+    // No startup action needed; the step function will set the brightness.
+}
+static void Animation_All_On_Step(void) {
+    for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+        device_memory[REG_LED_BASE + i] = animation_settings;
+    }
+
+    // Mark the registers as dirty so that the main loop applies the changes
+    APP_MarkRegsDirty();
+}
+
+/**
+ * @brief Turn all LEDs off.
+ */
+static void Animation_All_Off_Start(void) {
+    // No startup action needed; the step function will turn off the LEDs.
+}
+static void Animation_All_Off_Step(void) {
+    for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+        device_memory[REG_LED_BASE + i] = 0;
+    }
     APP_MarkRegsDirty();
 }

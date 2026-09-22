@@ -15,9 +15,9 @@ project using the Puya LL (Low Layer) driver library.
 * **LED driving** - 12 LEDs are driven from 4 GPIO pins by charlieplexing, with 64-step
   software PWM and optional gamma correction (curve exponent 2.2, built into a lookup table
   at boot; toggle via config bit 5). Per-LED brightness is set through registers `0x10`-`0x1B`.
-  Built-in animations (rotating loading pattern, breathing) can drive the array
-  automatically; select one through register `0x0F`, or set it to IDLE to control the
-  LEDs manually.
+  Built-in animations (loading, flashing, pulsing, breathing, ...) can drive the array
+  automatically; select one through register `0x0E` and adjust its setting (speed or
+  brightness) through register `0x0F`, or set it to IDLE to control the LEDs manually.
   The multiplex/PWM refresh is advanced by a TIM16 update interrupt every 24 µs, giving a
   ~54 Hz full-array refresh that is flicker-free. The main loop sleeps in `__WFI()` between
   interrupts and applies register writes between them, so I2C transactions are never blocked
@@ -59,9 +59,10 @@ starved by the display refresh.
 | `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read if config bit 0 is set. |
 | `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
 | `0x06` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
-| `0x07`-`0x0E` | R/O | `0x00` | Reserved for future encoder settings. Reads return `0x00`; writes are ignored. |
-| `0x0F` | R/W | `0x01` | Active animation, see [below](#animation-register-0x0f). |
-| `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. In IDLE mode (`0x0F` = `0x00`) these registers drive the LEDs directly; while an animation is running, the animation overwrites them. |
+| `0x07`-`0x0D` | R/O | `0x00` | Reserved for future encoder settings. Reads return `0x00`; writes are ignored. |
+| `0x0E` | R/W | `0xFE` | Active animation, see [below](#animation-register-0x0e). |
+| `0x0F` | R/W | `0x3F` | Setting of the animation selected through `0x0E`, see [below](#animation-settings-register-0x0f). Writing a new animation id to `0x0E` reloads this register with that animation's default. |
+| `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. In IDLE mode (`0x0E` = `0x00`) these registers drive the LEDs directly; while an animation is running, the animation overwrites them. |
 | `0x1C`-`0x1F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
 | `0x20`-`0xFF` | R/W | `0x00` | General-purpose I2C RAM. Not used by the firmware; usable as 224 bytes of host scratch space. |
 
@@ -89,7 +90,7 @@ Notes:
 * Register defaults are reinitialised only at power-on/reset; the general-purpose RAM is not
   preserved across resets.
 
-### Animation register (`0x0F`)
+### Animation register (`0x0E`)
 
 Selects the LED animation. New animations are added by extending the table in
 `User/animations.c` (see `User/animations.h` for the ID enum); unknown values fall
@@ -98,11 +99,37 @@ back to `IDLE`.
 | Value | Name | Description |
 | --- | --- | --- |
 | `0x00` | `IDLE` | Custom control: the LEDs are driven manually via registers `0x10`-`0x1B`. |
-| `0x01` | `LOADING` | Rotating loading pattern, one LED at a time reaching full brightness. **Default at power-on.** |
-| `0x02` | `BREATHING` | All LEDs smoothly fade in, hold, fade out and pause. |
-| `0x03` | `FOLLOWING` | Each 4 LEDs follow the encoder rotation (configurable with the `ANIMATION_FOLLOWING_LED_STEPS` constant). |
-| `0x04` | `POINT` | One LED follows the encoder rotation. |
-| `0x05` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The encoder count is capped between 0 and 100. |
+| `0x01` | `LOADING` | Rotating loading pattern, one LED at a time reaching full brightness. |
+| `0x02` | `FLASHING` | All LEDs flash on and off. |
+| `0x03` | `PULSING` | All LEDs smoothly ramp up and down in brightness. |
+| `0x04` | `BREATHING` | All LEDs smoothly fade in, hold, fade out and pause. |
+| `0x80` | `FOLLOWING` | Every 4th LED is lit and the pattern follows the encoder rotation (configurable with the `ANIMATION_FOLLOWING_LED_STEPS` constant). |
+| `0x81` | `POINT` | One LED follows the encoder rotation. |
+| `0x82` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The encoder count is capped between 0 and 100. |
+| `0xFE` | `ALL_ON` | All LEDs on at the brightness set through `0x0F`. Default to `CHARLIE_PWM_STEPS - 1`. |
+| `0xFF` | `ALL_OFF` | All LEDs off. |
+
+### Animation settings register (`0x0F`)
+
+Holds the setting of the animation selected through register `0x0E` (timing
+for LOADING/FLASHING/PULSING, brightness for ALL_ON and the off-state
+brightness of the non-lit LEDs for FOLLOWING/POINT). Writing a new animation id
+to `0x0E` loads that animation's default into `0x0F`; a subsequent write to
+`0x0F` adjusts the setting while the animation keeps running. A value of `0` is
+ignored and keeps the current setting.
+
+| Animation | Scale | Default | Meaning |
+| --- | --- | --- | --- |
+| `IDLE` | - | `0x00` | No setting. |
+| `LOADING` | x10 ms | `10` (100 ms) | Time between LED steps of the loading pattern. |
+| `FLASHING` | x10 ms | `25` (250 ms) | Time between LED state toggles. |
+| `PULSING` | x1 ms | `10` (10 ms) | Time between LED brightness changes. |
+| `BREATHING` | - | `0x00` | Timing fixed by the `ANIMATION_BREATHING_*` constants; no runtime setting. |
+| `FOLLOWING` | x brightness | `0` (off) | Brightness of the LEDs that are not lit. |
+| `POINT` | x brightness | `0` (off) | Brightness of the LEDs that are not lit. |
+| `GAUGE` | - | `0x00` | No runtime setting. |
+| `ALL_ON` | x brightness | `63` (full on) | Brightness of all LEDs. |
+| `ALL_OFF` | - | `0x00` | No setting. |
 
 Animations write their brightness values to the LED registers (`0x10`-`0x1B`) and
 mark them dirty, so the main loop applies them exactly like host writes. The
@@ -138,11 +165,27 @@ i2ctransfer -y 1 w13@0x36 0x10 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40
 i2cset -y 1 0x36 0x02 0x24
 
 # Switch to manual LED control (IDLE), then set LED 0 to quarter brightness
-i2cset -y 1 0x36 0x0F 0x00
+i2cset -y 1 0x36 0x0E 0x00
 i2cset -y 1 0x36 0x10 0x10
 
-# Switch to the breathing animation
-i2cset -y 1 0x36 0x0F 0x02
+# Switch to the pulsing animation; its default 10 ms pulse delay is loaded
+# into register 0x0F
+i2cset -y 1 0x36 0x0E 0x03
+
+# Speed the pulsing animation up to a 5 ms delay
+i2cset -y 1 0x36 0x0F 0x05
+
+# Switch to the loading animation (100 ms default step time), then slow the
+# rotation to 500 ms per step
+i2cset -y 1 0x36 0x0E 0x01
+i2cset -y 1 0x36 0x0F 0x32
+
+# Turn all LEDs on at the default full brightness, then dim them to half
+i2cset -y 1 0x36 0x0E 0xFE
+i2cset -y 1 0x36 0x0F 0x20
+
+# Turn all LEDs off
+i2cset -y 1 0x36 0x0E 0xFF
 
 # Use register 0x20 as scratch RAM
 i2cset -y 1 0x36 0x20 0xA5

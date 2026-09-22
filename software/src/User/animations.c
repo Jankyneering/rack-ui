@@ -89,6 +89,10 @@ static uint8_t Animation_SettingsDefault(uint8_t id) {
         return ANIMATION_PULSING_SETTINGS_DEFAULT;
     case ANIMATION_ALL_ON:
         return ANIMATION_ALL_ON_SETTINGS_DEFAULT;
+    case ANIMATION_FOLLOWING:
+        return ANIMATION_FOLLOWING_SETTINGS_DEFAULT;
+    case ANIMATION_POINT:
+        return ANIMATION_POINT_SETTINGS_DEFAULT;
     default:
         return 0;
     }
@@ -142,6 +146,12 @@ void Animations_SetSettings(uint8_t settings) {
     }
     animation_settings = settings;
     device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
+    if (current_id == ANIMATION_ALL_ON) {
+        for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+            device_memory[REG_LED_BASE + i] = animation_settings;
+        }
+        APP_MarkRegsDirty();
+    }
 }
 
 uint8_t Animations_GetSettings(void) {
@@ -396,9 +406,10 @@ static void Animation_Following_Start(void) {
 static void Animation_Following_Step(void) {
     // Get the current encoder rotation count
     int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
-    // Set LED states
+    // Set LED states; the animation setting (register 0x0F) is the brightness
+    // of the LEDs that are not lit
     for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
-        device_memory[REG_LED_BASE + i] = (i-rotation_count)%ANIMATION_FOLLOWING_LED_STEPS == 0 ? CHARLIE_PWM_STEPS-1 : 0; // Light up every third LED
+        device_memory[REG_LED_BASE + i] = (i-rotation_count)%ANIMATION_FOLLOWING_LED_STEPS == 0 ? CHARLIE_PWM_STEPS-1 : animation_settings; // Light up every third LED
     }
     // Mark the registers as dirty so that the main loop applies the changes
     APP_MarkRegsDirty();
@@ -415,9 +426,10 @@ static void Animation_Point_Start(void) {
 static void Animation_Point_Step(void) {
     // Get the current encoder rotation count
     int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
-    // Set LED states
+    // Set LED states; the animation setting (register 0x0F) is the brightness
+    // of the LEDs that are not lit
     for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
-        device_memory[REG_LED_BASE + i] = (i-rotation_count)%CHARLIE_LED_COUNT == 0 ? CHARLIE_PWM_STEPS-1 : 0;
+        device_memory[REG_LED_BASE + i] = (i-rotation_count)%CHARLIE_LED_COUNT == 0 ? CHARLIE_PWM_STEPS-1 : animation_settings;
     }
     // Mark the registers as dirty so that the main loop applies the changes
     APP_MarkRegsDirty();
@@ -484,19 +496,18 @@ static void Animation_Gauge_Step(void) {
 
 /**
  * @brief Turn all LEDs on at set brightness.
+ * The brightness is the animation setting (register 0x0F).
  */
 static void Animation_All_On_Start(void) {
     for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
-        device_memory[REG_LED_BASE + i] = Animations_GetSettings(); // Use the current animation settings for brightness
+        device_memory[REG_LED_BASE + i] = animation_settings;
     }
-    APP_MarkRegsDirty();
 
-    // go back to idle after turning all LEDs on
-    Animations_Set(ANIMATION_IDLE);
+    // Mark the registers as dirty so that the main loop applies the changes
+    APP_MarkRegsDirty();
 }
 static void Animation_All_On_Step(void) {
     // No step needed for all-on animation; it's a one-time action.
-    Animations_Set(ANIMATION_IDLE);
 }
 
 /**
@@ -507,11 +518,7 @@ static void Animation_All_Off_Start(void) {
         device_memory[REG_LED_BASE + i] = 0;
     }
     APP_MarkRegsDirty();
-
-    // go back to idle after turning all LEDs off
-    Animations_Set(ANIMATION_IDLE);
 }
 static void Animation_All_Off_Step(void) {
     // No step needed for all-off animation; it's a one-time action.
-    Animations_Set(ANIMATION_IDLE);
 }

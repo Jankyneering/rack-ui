@@ -50,19 +50,24 @@ ANIMATIONS = [
     (0x00, "IDLE", "LEDs are driven manually from registers 0x10-0x1B"),
     (0x01, "LOADING", "rotating loading pattern"),
     (0x02, "FLASHING", "all LEDs flash on and off"),
-    (0x03, "PULSING", "all LEDs pulse in brightness (firmware default)"),
+    (0x03, "PULSING", "all LEDs pulse in brightness"),
     (0x04, "BREATHING", "all LEDs fade in and out"),
     (0x80, "FOLLOWING", "every 4th LED lit, pattern follows rotation"),
     (0x81, "POINT", "single LED points at the rotation position"),
     (0x82, "GAUGE", "gauge fill level follows rotation, 0-100 (count resets on entry)"),
+    (0xFE, "ALL_ON", "all LEDs on at the brightness set through 0x0F (firmware default)"),
+    (0xFF, "ALL_OFF", "all LEDs off"),
 ]
 
-# Timing-setting scale (ms per register step), default value and description
-# for the animations that use register 0x0F (REG_ANIMATION_SETTINGS).
+# Settings register (0x0F) scale (ms per step, or None for a brightness
+# setting), default value and description for the animations that use it.
 ANIMATION_SETTINGS = {
     0x01: (10, 10, "LOADING step time is value * 10 ms (default 10 = 100 ms)"),
     0x02: (10, 25, "FLASHING toggle time is value * 10 ms (default 25 = 250 ms)"),
     0x03: (1, 10, "PULSING brightness delay is value * 1 ms (default 10 = 10 ms)"),
+    0xFE: (None, 0x3F, "ALL_ON brightness is the value (default 0x3F = full on)"),
+    0x80: (None, 0, "FOLLOWING non-lit LED brightness is the value (default 0 = off)"),
+    0x81: (None, 0, "POINT non-lit LED brightness is the value (default 0 = off)"),
 }
 
 i2c = i2cdriver.I2CDriver(sys.argv[1] if len(sys.argv) > 1 else PORT)
@@ -354,15 +359,30 @@ def step_animations():
         if anim_id in ANIMATION_SETTINGS:
             scale, default, settings_description = ANIMATION_SETTINGS[anim_id]
             settings = read_regs(REG_ANIMATION_SETTINGS, 1)
-            check(settings == [default], f"{name} timing default {default} loaded into 0x0F", f"animation settings readback {settings} for {name} (expected {[default]})")
+            check(settings == [default], f"{name} settings default 0x{default:02X} loaded into 0x0F", f"animation settings readback {settings} for {name} (expected {[default]})")
             print(f"  {settings_description}")
             live_encoder_display()
-            new_value = 5 if default != 5 else 6
-            set_reg(REG_ANIMATION_SETTINGS, new_value)
-            settings = read_regs(REG_ANIMATION_SETTINGS, 1)
-            check(settings == [new_value], f"{name} timing setting writable (0x{new_value:02X} = {new_value * scale} ms)", f"animation settings readback {settings} for {name} (expected {[new_value]})")
-            oled_msg(f"SET 0x{new_value:02X} = {new_value * scale} ms")
-            print(f"  Timing setting changed to 0x{new_value:02X} ({new_value * scale} ms); press to continue")
+            if anim_id == 0xFE:
+                new_value = 0x20
+                set_reg(REG_ANIMATION_SETTINGS, new_value)
+                settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+                check(settings == [new_value], f"{name} brightness setting writable (0x{new_value:02X})", f"animation settings readback {settings} for {name} (expected {[new_value]})")
+                oled_msg(f"ALL ON 0x{new_value:02X}")
+                print(f"  All-on brightness changed to 0x{new_value:02X}; press to continue")
+            elif anim_id in (0x80, 0x81):
+                new_value = 8
+                set_reg(REG_ANIMATION_SETTINGS, new_value)
+                settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+                check(settings == [new_value], f"{name} off-brightness setting writable (0x{new_value:02X})", f"animation settings readback {settings} for {name} (expected {[new_value]})")
+                oled_msg(f"OFF BRT 0x{new_value:02X}")
+                print(f"  Non-lit LED brightness changed to 0x{new_value:02X}; press to continue")
+            else:
+                new_value = 5 if default != 5 else 6
+                set_reg(REG_ANIMATION_SETTINGS, new_value)
+                settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+                check(settings == [new_value], f"{name} timing setting writable (0x{new_value:02X} = {new_value * scale} ms)", f"animation settings readback {settings} for {name} (expected {[new_value]})")
+                oled_msg(f"SET 0x{new_value:02X} = {new_value * scale} ms")
+                print(f"  Timing setting changed to 0x{new_value:02X} ({new_value * scale} ms); press to continue")
         live_encoder_display()
 
 
@@ -377,9 +397,9 @@ def step_soft_reset():
     gp = read_regs(REG_GP_BASE, 1)
     check(gp == [0x00], "GP RAM back to power-on default 0x00", f"GP RAM after reset {gp}")
     anim = read_regs(REG_ANIMATION, 1)
-    check(anim == [0x03], "animation back to default PULSING", f"animation after reset {anim}")
+    check(anim == [0xFE], "animation back to default ALL_ON", f"animation after reset {anim}")
     settings = read_regs(REG_ANIMATION_SETTINGS, 1)
-    check(settings == [0x0A], "animation settings back to default 10 for PULSING", f"animation settings after reset {settings}")
+    check(settings == [0x3F], "animation settings back to default 0x3F for ALL_ON", f"animation settings after reset {settings}")
     config = read_regs(REG_CONFIG, 1)
     check(config == [0x00], "config back to default 0x00", f"config after reset {config}")
 

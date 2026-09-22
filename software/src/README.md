@@ -106,7 +106,7 @@ back to `IDLE`.
 | `0x80` | `FOLLOWING` | Every 4th LED is lit and the pattern follows the encoder rotation (configurable with the `ANIMATION_FOLLOWING_LED_STEPS` constant). |
 | `0x81` | `POINT` | One LED follows the encoder rotation. |
 | `0x82` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The encoder count is capped between 0 and 100. |
-| `0xFE` | `ALL_ON` | All LEDs on at the brightness set through `0x0F`. **Default at power-on.** |
+| `0xFE` | `ALL_ON` | All LEDs on at the brightness set through `0x0F`. Default to `CHARLIE_PWM_STEPS - 1`. |
 | `0xFF` | `ALL_OFF` | All LEDs off. |
 
 ### Animation settings register (`0x0F`)

@@ -9,6 +9,10 @@ down. The framebuffer is page-major: one byte per column covers 8 vertical
 pixels, LSB = topmost row of the page. On the common two-color modules the
 top 16 rows (y 0-15) are yellow and the rest is blue, which makes rows 0-15 a
 natural title band.
+
+The SSD1306 GDDRAM is undefined at power-up, so init() pushes a full clear to
+the display. Only dirty pages are re-sent afterwards; the shadow copy of the
+last flushed content makes that bookkeeping possible.
 """
 
 WIDTH = 128
@@ -101,6 +105,13 @@ class SSD1306:
             0xA4,  # display follows RAM
             0xA6,  # normal (non-inverted) display
         )
+        # GDDRAM is undefined at power-up: force a full clear before enabling the
+        # panel, and sync the shadow so the first dirty-page flush is correct.
+        for page in range(self.pages):
+            self._set_window(page)
+            self.i2c.start(self.address, 0)
+            self.i2c.write(bytes([DATA]) + bytes(self.width))
+            self.i2c.stop()
         self.command(0xAF)  # display on
 
     def command(self, *cmds):

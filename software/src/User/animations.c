@@ -36,11 +36,20 @@ static void Animation_Loading_Start(void);
 static void Animation_Loading_Step(void);
 static void Animation_Breathing_Start(void);
 static void Animation_Breathing_Step(void);
+static void Animation_Following_Start(void);
+static void Animation_Following_Step(void);
+static void Animation_Point_Start(void);
+static void Animation_Point_Step(void);
+static void Animation_Gauge_Start(void);
+static void Animation_Gauge_Step(void);
 
 static const Animation_Entry_t animation_table[] = {
     {ANIMATION_IDLE, Animation_Idle_Start, Animation_Idle_Step},
     {ANIMATION_LOADING, Animation_Loading_Start, Animation_Loading_Step},
     {ANIMATION_BREATHING, Animation_Breathing_Start, Animation_Breathing_Step},
+    {ANIMATION_FOLLOWING, Animation_Following_Start, Animation_Following_Step},
+    {ANIMATION_POINT, Animation_Point_Start, Animation_Point_Step},
+    {ANIMATION_GAUGE, Animation_Gauge_Start, Animation_Gauge_Step},
 };
 
 static const Animation_Entry_t *active_animation = &animation_table[0];
@@ -218,6 +227,104 @@ static void Animation_Breathing_Step(void) {
     // Apply the calculated brightness to all LEDs
     for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
         device_memory[REG_LED_BASE + i] = brightness;
+    }
+
+    // Mark the registers as dirty so that the main loop applies the changes
+    APP_MarkRegsDirty();
+}
+
+
+/**
+ * @brief Perform a following animation on the Charlieplex LEDs.
+ * This animation lights up one in three LEDs based on the encoder rotation, creating a "following" effect.
+ */
+static void Animation_Following_Start(void) {
+    // Nothing to reset: the master owns the LED brightness registers.
+}
+
+static void Animation_Following_Step(void) {
+    // Get the current encoder rotation count
+    int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
+    // Set LED states
+    for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+        device_memory[REG_LED_BASE + i] = (i-rotation_count)%ANIMATION_FOLLOWING_LED_STEPS == 0 ? CHARLIE_PWM_STEPS-1 : 0; // Light up every third LED
+    }
+    // Mark the registers as dirty so that the main loop applies the changes
+    APP_MarkRegsDirty();
+}
+
+/**
+ * @brief Perform a point animation on the Charlieplex LEDs.
+ * This animation lights up one LED at a time based on the encoder rotation, creating a "pointing" effect.
+ */
+static void Animation_Point_Start(void) {
+    // Nothing to reset: the master owns the LED brightness registers.
+}
+
+static void Animation_Point_Step(void) {
+    // Get the current encoder rotation count
+    int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
+    // Set LED states
+    for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+        device_memory[REG_LED_BASE + i] = (i-rotation_count)%CHARLIE_LED_COUNT == 0 ? CHARLIE_PWM_STEPS-1 : 0;
+    }
+    // Mark the registers as dirty so that the main loop applies the changes
+    APP_MarkRegsDirty();
+}
+
+/**
+ * @brief Perform a gauge animation on the Charlieplex LEDs.
+ * This animation lights up LEDs in a gauge pattern based on the encoder rotation.
+ */
+static uint32_t last_gauge_tick = 0;
+static void Animation_Gauge_Start(void) {
+    // Reset encoder count to zero for a fresh start (signed 16-bit value)
+    device_memory[REG_ENC_COUNT_HI] = 0x00;
+    device_memory[REG_ENC_COUNT_LO] = 0x00;
+
+    last_gauge_tick = sys_tick_ms;
+}
+
+static void Animation_Gauge_Step(void) {
+    if ((sys_tick_ms - last_gauge_tick) < 50) // Update every 50ms
+        return;
+    last_gauge_tick = sys_tick_ms;
+    
+    // Get the current encoder rotation count
+    int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
+
+    // Clamp percentage to 0-100 range
+    if (rotation_count < 0) {
+        rotation_count = 0;
+        // clamp device_memory[REG_ENC_COUNT_HI] and device_memory[REG_ENC_COUNT_LO] to 0
+        device_memory[REG_ENC_COUNT_HI] = (uint8_t)((rotation_count >> 8) & 0xFF);
+        device_memory[REG_ENC_COUNT_LO] = (uint8_t)(rotation_count & 0xFF);
+    } else if (rotation_count > 100) {
+        rotation_count = 100;
+        // clamp device_memory[REG_ENC_COUNT_HI] and device_memory[REG_ENC_COUNT_LO] to 100
+        device_memory[REG_ENC_COUNT_HI] = (uint8_t)((rotation_count >> 8) & 0xFF);
+        device_memory[REG_ENC_COUNT_LO] = (uint8_t)(rotation_count & 0xFF);
+    } 
+
+    // calculate the brightness for each LED based on the percentage
+    // each LED represents ~8.33% of the gauge, each LED maps to a range of 0-8.33% of the total percentage
+    for (uint8_t i = 0; i < ANIMATION_GAUGE_LED_COUNT; i++) {
+        // calculate the percentage range for this LED
+        float led_percentage_start = (i * 100.0f) / ANIMATION_GAUGE_LED_COUNT;
+        float led_percentage_end = ((i + 1) * 100.0f) / ANIMATION_GAUGE_LED_COUNT;
+
+        if (rotation_count >= led_percentage_end) {
+            // LED is fully lit
+            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED)%CHARLIE_LED_COUNT] = CHARLIE_PWM_STEPS - 1;
+        } else if (rotation_count <= led_percentage_start) {
+            // LED is off
+            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED)%CHARLIE_LED_COUNT] = 0;
+        } else {
+            // LED is partially lit, calculate brightness based on the percentage
+            float led_range = led_percentage_end - led_percentage_start;
+            float led_brightness_percentage = (rotation_count - led_percentage_start) / led_range;
+            device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED)%CHARLIE_LED_COUNT] = (uint8_t)(led_brightness_percentage * (CHARLIE_PWM_STEPS - 1));
+        }
     }
 
     // Mark the registers as dirty so that the main loop applies the changes

@@ -161,22 +161,22 @@ void EXTI0_1_IRQHandler(void) {
 }
 
 void EXTI4_15_IRQHandler(void) {
-    // --- Encoder rotation (EncA, PA5) ---
-    if (LL_EXTI_IsActiveFlag(LL_EXTI_LINE_5)) {
-        LL_EXTI_ClearFlag(LL_EXTI_LINE_5);
+    // --- Encoder rotation (EncA; pin and EXTI line follow ENCODER_AB_SWAP) ---
+    if (LL_EXTI_IsActiveFlag(ENC_A_EXTI_LINE)) {
+        LL_EXTI_ClearFlag(ENC_A_EXTI_LINE);
 
         // 1 ms glitch guard only; real debounce is the RC filter (see above).
         if ((sys_tick_ms - last_encoder_tick) >= ENCODER_DEBOUNCE_MS) {
             last_encoder_tick = sys_tick_ms;
 
             // EncA just transitioned; EncB's level at this instant gives direction.
-            bool enc_b = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_4);
+            bool enc_b = LL_GPIO_IsInputPinSet(GPIOA, ENC_B_PIN);
 
 #ifdef ENCODER_TRIGGER_TOGGLE
             /* On a rising EncA edge EncB's level means the opposite of what it
              * does on a falling edge, so the decode must account for which edge
              * fired; sampling EncA's new level tells us. */
-            bool enc_a = LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_5);
+            bool enc_a = LL_GPIO_IsInputPinSet(GPIOA, ENC_A_PIN);
             int8_t delta = (enc_a == enc_b) ? -1 : 1;
 #else
             int8_t delta = enc_b ? 1 : -1;

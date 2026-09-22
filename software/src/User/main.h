@@ -111,6 +111,24 @@ extern "C" {
  * the two compose (both set = net unchanged). */
 /* #define ENCODER_DIRECTION_FLIP */
 
+/* Swap the encoder phase inputs: EncA moves to PA4, EncB to PA5, for encoder
+ * models whose trigger output sits on the other phase (or whose A/B pins are
+ * wired the other way round). Note that swapping the phases also inverts the
+ * decoded direction; combine with ENCODER_DIRECTION_FLIP to compensate. */
+/* #define ENCODER_AB_SWAP */
+
+#ifdef ENCODER_AB_SWAP
+#define ENC_A_PIN           LL_GPIO_PIN_4
+#define ENC_A_EXTI_LINE     LL_EXTI_LINE_4
+#define ENC_A_EXTI_SOURCE   LL_EXTI_CONFIG_LINE4
+#define ENC_B_PIN           LL_GPIO_PIN_5
+#else
+#define ENC_A_PIN           LL_GPIO_PIN_5
+#define ENC_A_EXTI_LINE     LL_EXTI_LINE_5
+#define ENC_A_EXTI_SOURCE   LL_EXTI_CONFIG_LINE5
+#define ENC_B_PIN           LL_GPIO_PIN_4
+#endif
+
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions prototypes ---------------------------------------------*/
 void APP_ErrorHandler(void);

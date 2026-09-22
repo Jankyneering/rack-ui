@@ -190,13 +190,14 @@ static void APP_Encoder_Init(void) {
     GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    // Configure EXTI for PA5 (EncA) to detect rotation;
-    // direction is read from EncB's level at the moment EncA transitions.
+    // Configure EXTI for EncA to detect rotation; direction is read from
+    // EncB's level at the moment EncA transitions.
     // ENCODER_TRIGGER_TOGGLE counts both edges (one tick per detent on encoders
     // that produce one EncA edge per detent); the default falling-edge-only mode
-    // gives one tick per two detents on such encoders.
+    // gives one tick per two detents on such encoders. The ENC_A_* macros follow
+    // ENCODER_AB_SWAP, so the trigger moves with the swapped phase.
     LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
-    EXTI_InitStruct.Line        = LL_EXTI_LINE_5;
+    EXTI_InitStruct.Line        = ENC_A_EXTI_LINE;
     EXTI_InitStruct.LineCommand = ENABLE;
     EXTI_InitStruct.Mode        = LL_EXTI_MODE_IT;
 #ifdef ENCODER_TRIGGER_TOGGLE
@@ -212,7 +213,7 @@ static void APP_Encoder_Init(void) {
     LL_EXTI_Init(&EXTI_InitStruct);
 
     // Connect EXTI lines to GPIOA
-    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE5);
+    LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, ENC_A_EXTI_SOURCE);
     LL_EXTI_SetEXTISource(LL_EXTI_CONFIG_PORTA, LL_EXTI_CONFIG_LINE0);
 
     // Line 0 is serviced by EXTI0_1_IRQHandler, line 5 by EXTI4_15_IRQHandler —

@@ -16,8 +16,8 @@ project using the Puya LL (Low Layer) driver library.
   software PWM and optional gamma correction (curve exponent 2.2, built into a lookup table
   at boot; toggle via config bit 5). Per-LED brightness is set through registers `0x10`-`0x1B`.
   Built-in animations (loading, flashing, pulsing, breathing, ...) can drive the array
-  automatically; select one through register `0x0E` and adjust its speed through register
-  `0x0F`, or set it to IDLE to control the LEDs manually.
+  automatically; select one through register `0x0E` and adjust its setting (speed or
+  brightness) through register `0x0F`, or set it to IDLE to control the LEDs manually.
   The multiplex/PWM refresh is advanced by a TIM16 update interrupt every 24 µs, giving a
   ~54 Hz full-array refresh that is flicker-free. The main loop sleeps in `__WFI()` between
   interrupts and applies register writes between them, so I2C transactions are never blocked
@@ -61,7 +61,7 @@ starved by the display refresh.
 | `0x06` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
 | `0x07`-`0x0D` | R/O | `0x00` | Reserved for future encoder settings. Reads return `0x00`; writes are ignored. |
 | `0x0E` | R/W | `0xFE` | Active animation, see [below](#animation-register-0x0e). |
-| `0x0F` | R/W | `0x0A` | Timing setting of the animation selected through `0x0E`, see [below](#animation-settings-register-0x0f). Writing a new animation id to `0x0E` reloads this register with that animation's default. |
+| `0x0F` | R/W | `0x3F` | Setting of the animation selected through `0x0E`, see [below](#animation-settings-register-0x0f). Writing a new animation id to `0x0E` reloads this register with that animation's default. |
 | `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. In IDLE mode (`0x0E` = `0x00`) these registers drive the LEDs directly; while an animation is running, the animation overwrites them. |
 | `0x1C`-`0x1F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
 | `0x20`-`0xFF` | R/W | `0x00` | General-purpose I2C RAM. Not used by the firmware; usable as 224 bytes of host scratch space. |

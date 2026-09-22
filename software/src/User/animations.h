@@ -26,19 +26,24 @@ extern "C" {
 typedef enum {
     ANIMATION_IDLE      = 0x00, /* LEDs are driven manually through registers 0x10-0x1B */
     ANIMATION_LOADING   = 0x01, /* rotating loading pattern (default) */
-    ANIMATION_BREATHING = 0x02, /* all LEDs fade in and out */
-    ANIMATION_FOLLOWING = 0x03, /* LEDs follow the encoder rotation (one LED per detent) */
-    ANIMATION_POINT     = 0x04, /* one LED lights up at a time, moving with the encoder rotation */
-    ANIMATION_GAUGE     = 0x05, /* LEDs light up in a gauge pattern based on the encoder rotation */
+    ANIMATION_FLASHING  = 0x02, /* all LEDs flash on and off */
+    ANIMATION_PULSING   = 0x03, /* all LEDs pulse in brightness */
+    ANIMATION_BREATHING = 0x04, /* all LEDs fade in and out */
+
+    ANIMATION_FOLLOWING = 0x80, /* LEDs follow the encoder rotation (one LED per detent) */
+    ANIMATION_POINT     = 0x81, /* one LED lights up at a time, moving with the encoder rotation */
+    ANIMATION_GAUGE     = 0x82, /* LEDs light up in a gauge pattern based on the encoder rotation */
     /* Add new animations here, then register them in the animation table in
      * animations.c. */
 } Animation_Id_t;
 
-#define ANIMATION_DEFAULT ANIMATION_LOADING
+#define ANIMATION_DEFAULT ANIMATION_PULSING
 
 /* Animation settings. */
 #define ANIMATION_TICK_MS 11              // Animation engine tick, driven from the main loop.
 #define ANIMATION_LOADING_TICK_MS 100     // Time between LED steps in the loading animation.
+#define ANIMATION_FLASHING_TICK_MS 250    // Time between LED state toggles in the flashing animation.
+#define ANIMATION_PULSING_TICK_MS 10     // Time between LED brightness changes in the pulsing animation.
 #define ANIMATION_BREATHING_IN_MS 1500    // Time for LEDs to fade in during the breathing animation.
 #define ANIMATION_BREATHING_HOLD_MS 750   // Time to hold full brightness during the breathing animation.
 #define ANIMATION_BREATHING_OUT_MS 2500   // Time for LEDs to fade out during the breathing animation.

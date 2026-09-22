@@ -34,8 +34,13 @@ static void Animation_Idle_Start(void);
 static void Animation_Idle_Step(void);
 static void Animation_Loading_Start(void);
 static void Animation_Loading_Step(void);
+static void Animation_Flashing_Start(void);
+static void Animation_Flashing_Step(void);
+static void Animation_Pulsing_Start(void);
+static void Animation_Pulsing_Step(void);
 static void Animation_Breathing_Start(void);
 static void Animation_Breathing_Step(void);
+
 static void Animation_Following_Start(void);
 static void Animation_Following_Step(void);
 static void Animation_Point_Start(void);
@@ -46,7 +51,10 @@ static void Animation_Gauge_Step(void);
 static const Animation_Entry_t animation_table[] = {
     {ANIMATION_IDLE, Animation_Idle_Start, Animation_Idle_Step},
     {ANIMATION_LOADING, Animation_Loading_Start, Animation_Loading_Step},
+    {ANIMATION_FLASHING, Animation_Flashing_Start, Animation_Flashing_Step},
+    {ANIMATION_PULSING, Animation_Pulsing_Start, Animation_Pulsing_Step},
     {ANIMATION_BREATHING, Animation_Breathing_Start, Animation_Breathing_Step},
+
     {ANIMATION_FOLLOWING, Animation_Following_Start, Animation_Following_Step},
     {ANIMATION_POINT, Animation_Point_Start, Animation_Point_Step},
     {ANIMATION_GAUGE, Animation_Gauge_Start, Animation_Gauge_Step},
@@ -105,6 +113,8 @@ static void Animation_Idle_Step(void) {
     /* Nothing to do: LED register writes are applied by the main loop. */
 }
 
+/* Standalone animations */
+
 /**
  * @brief Perform a rotating loading animation on the Charlieplex LEDs.
  * This animation lights up each LED in a circular pattern, with each LED
@@ -141,6 +151,75 @@ static void Animation_Loading_Step(void) {
         APP_MarkRegsDirty();
     }
 }
+
+/**
+ * @brief Perform a flashing animation on the Charlieplex LEDs.
+ * This animation makes all LEDs flash on and off in a synchronized manner.
+ */
+static uint32_t last_flashing_tick = 0;
+static bool flashing_state = false;
+
+static void Animation_Flashing_Start(void) {
+    flashing_state = 0;
+    last_flashing_tick = sys_tick_ms;
+}
+
+static void Animation_Flashing_Step(void) {
+    if ((sys_tick_ms - last_flashing_tick) >= ANIMATION_FLASHING_TICK_MS) {
+        last_flashing_tick = sys_tick_ms;
+
+        flashing_state = !flashing_state;
+
+        // Apply the flashing state to all LEDs
+        for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+            device_memory[REG_LED_BASE + i] = flashing_state ? CHARLIE_PWM_STEPS-1 : 0;
+        }
+
+        // Mark the registers as dirty so that the main loop applies the changes
+        APP_MarkRegsDirty();
+    }
+}
+
+/**
+ * @brief Perform a pulsing animation on the Charlieplex LEDs.
+ * This animation smoothly increases and decreases the brightness of all LEDs.
+ */
+static uint32_t last_pulsing_tick = 0;
+static uint8_t pulsing_brightness = 0;
+static int8_t pulsing_direction = 1;
+
+static void Animation_Pulsing_Start(void) {
+    pulsing_brightness = 0;
+    pulsing_direction = 1;
+    last_pulsing_tick = sys_tick_ms;
+}
+
+static void Animation_Pulsing_Step(void) {
+    if ((sys_tick_ms - last_pulsing_tick) >= ANIMATION_PULSING_TICK_MS) {
+        last_pulsing_tick = sys_tick_ms;
+
+        // Update the brightness
+        pulsing_brightness += pulsing_direction;
+
+        // Change direction if we reach the limits
+        if (pulsing_brightness >= CHARLIE_PWM_STEPS - 1) {
+            pulsing_brightness = CHARLIE_PWM_STEPS - 1;
+            pulsing_direction = -1;
+        } else if (pulsing_brightness <= 0) {
+            pulsing_brightness = 0;
+            pulsing_direction = 1;
+        }
+
+        // Apply the current brightness to all LEDs
+        for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+            device_memory[REG_LED_BASE + i] = pulsing_brightness;
+        }
+
+        // Mark the registers as dirty so that the main loop applies the changes
+        APP_MarkRegsDirty();
+    }
+}
+
 
 /**
  * @brief Perform a breathing animation on the Charlieplex LEDs.
@@ -233,6 +312,7 @@ static void Animation_Breathing_Step(void) {
     APP_MarkRegsDirty();
 }
 
+/* Animations with encoder reactions */
 
 /**
  * @brief Perform a following animation on the Charlieplex LEDs.

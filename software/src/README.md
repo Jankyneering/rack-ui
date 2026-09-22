@@ -177,13 +177,13 @@ V=1 make                          # verbose output (prints full command lines)
 
 Encoder build flags in `User/main.h`:
 
-- `ENCODER_TRIGGER_TOGGLE` (defined) - count both EncA edges (one tick per detent on
-  encoders that produce one edge per detent); comment the `#define` out to count the
-  falling edge only
+- `ENCODER_TRIGGER_TOGGLE` (undefined by default) - define it to count both EncA
+  edges (one tick per detent on encoders that produce one edge per detent); leave it
+  commented out to count the falling edge only
 - `ENCODER_DIRECTION_FLIP` (undefined by default) - define it to make clockwise
   rotation decrement the count instead of incrementing, for encoder models with
   reversed phase wiring; composes with the runtime `CFG_ENC_DIR_FLIP` config bit
-- `ENCODER_AB_SWAP` (undefined by default) - define it to swap the phase inputs
+- `ENCODER_AB_SWAP` (defined) - swap the phase inputs
   (EncA moves to PA4, EncB to PA5) for encoder models whose trigger output sits on
   the other phase or whose A/B pins are wired the other way round; note that
   swapping the phases also inverts the decoded direction, so combine it with

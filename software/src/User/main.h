@@ -68,22 +68,22 @@ extern "C" {
 #define I2C_SLAVE_ADDR 0x36
 
 /* Register map */
-#define REG_COUNT 256           /* 0x00-0xFF, one byte each */
-#define REG_FW_VERSION_HI 0x00  /* R/O: firmware version, high byte */
-#define REG_SOFT_RESET 0x00     /* W: command register (same address as version hi): \
-                                    writing any non-zero value soft-resets the MCU */
-#define REG_FW_VERSION_LO 0x01  /* R/O: firmware version, low byte */
-#define REG_CONFIG 0x02         /* R/W: configuration bits, default 0x00 */
-#define REG_ENC_COUNT_HI 0x03   /* R/W: encoder rotation count, high byte */
-#define REG_ENC_COUNT_LO 0x04   /* R/W: encoder rotation count, low byte */
-#define REG_ENC_PUSH_COUNT 0x05 /* R/W: encoder push button count */
-#define REG_ENC_PUSH_STATE 0x06 /* R/O: encoder push button state */
-#define REG_ANIMATION 0x0E      /* R/W: active animation, see animations.h:   \
-                                  0x00 = IDLE (custom control over the LEDs), \
-                                  0x01 = LOADING, 0x02 = FLASHING, ... */
-#define REG_ANIMATION_SETTINGS 0x0F /* R/W: timing setting of the animation \
+#define REG_COUNT 256               /* 0x00-0xFF, one byte each */
+#define REG_FW_VERSION_HI 0x00      /* R/O: firmware version, high byte */
+#define REG_SOFT_RESET 0x00         /* W: command register (same address as version hi): \
+                                        writing any non-zero value soft-resets the MCU */
+#define REG_FW_VERSION_LO 0x01      /* R/O: firmware version, low byte */
+#define REG_CONFIG 0x02             /* R/W: configuration bits, default 0x00 */
+#define REG_ENC_COUNT_HI 0x03       /* R/W: encoder rotation count, high byte */
+#define REG_ENC_COUNT_LO 0x04       /* R/W: encoder rotation count, low byte */
+#define REG_ENC_PUSH_COUNT 0x05     /* R/W: encoder push button count */
+#define REG_ENC_PUSH_STATE 0x06     /* R/O: encoder push button state */
+#define REG_ANIMATION 0x0E          /* R/W: active animation, see animations.h:   \
+                                      0x00 = IDLE (custom control over the LEDs), \
+                                      0x01 = LOADING, 0x02 = FLASHING, ... */
+#define REG_ANIMATION_SETTINGS 0x0F /* R/W: timing setting of the animation         \
                                   selected through REG_ANIMATION, see animations.h. \
-                                  Writing REG_ANIMATION loads the new animation's \
+                                  Writing REG_ANIMATION loads the new animation's   \
                                   default into this register. */
 /* 0x08-0x0D: reserved, reads as 0x00, writes ignored */
 #define REG_LED_BASE 0x10 /* R/W: LED brightness, one register per LED */

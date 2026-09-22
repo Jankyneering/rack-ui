@@ -50,8 +50,8 @@ static void slave_transmit_next(void) {
     uint8_t reg = current_reg_ptr;
 
     if (reg == REG_ENC_PUSH_STATE) {
-        bool pressed = !LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0);
-        bool flipped = device_memory[REG_CONFIG] & CFG_PUSH_STATE_FLIP;
+        bool pressed                      = !LL_GPIO_IsInputPinSet(GPIOA, LL_GPIO_PIN_0);
+        bool flipped                      = device_memory[REG_CONFIG] & CFG_PUSH_STATE_FLIP;
         device_memory[REG_ENC_PUSH_STATE] = (pressed != flipped) ? 0x01 : 0x00;
     }
 
@@ -180,7 +180,7 @@ void EXTI4_15_IRQHandler(void) {
             /* On a rising EncA edge EncB's level means the opposite of what it
              * does on a falling edge, so the decode must account for which edge
              * fired; sampling EncA's new level tells us. */
-            bool enc_a = LL_GPIO_IsInputPinSet(GPIOA, ENC_A_PIN);
+            bool enc_a   = LL_GPIO_IsInputPinSet(GPIOA, ENC_A_PIN);
             int8_t delta = (enc_a == enc_b) ? -1 : 1;
 #else
             int8_t delta = enc_b ? 1 : -1;

@@ -23,8 +23,8 @@ static const uint32_t charlie_pins[CHARLIE_PIN_COUNT] = {
 };
 
 /*
-* Mapping of LED numbers to anode/cathode pin pairs.
-*/
+ * Mapping of LED numbers to anode/cathode pin pairs.
+ */
 #if HW_VERSION == 0x0100
 static const uint8_t charlie_map[CHARLIE_LED_COUNT][2] = {
     {0, 2}, // 0
@@ -96,7 +96,7 @@ static void charlie_build_luts(void) {
 static inline void charlie_apply_state(uint8_t state_index) {
     if (state_index == charlie_last_state)
         return;
-    charlie_last_state       = state_index;
+    charlie_last_state = state_index;
 
     /* Ghost fix: OTYPER and ODR are two separate writes, and OTYPER-first
      * forward-biases a third LED in between — the new anode is push-pull

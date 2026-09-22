@@ -74,8 +74,13 @@ typedef enum {
 /* Called once at boot to initialize the animation engine. */
 void Animations_Init(void);
 
-/* Select the active animation. Unknown values fall back to ANIMATION_IDLE. */
+/* Select the active animation. Unknown values fall back to ANIMATION_IDLE.
+ * Loading a new animation also loads its default timing setting. */
 void Animations_Set(uint8_t id);
+
+/* Update the timing setting of the current animation. A value of 0 keeps
+ * the current setting; ignored for animations without a timing setting. */
+void Animations_SetSettings(uint8_t settings);
 
 /* Current animation value, as exposed in register 0x0E. */
 uint8_t Animations_Get(void);

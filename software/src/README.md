@@ -100,6 +100,9 @@ back to `IDLE`.
 | `0x00` | `IDLE` | Custom control: the LEDs are driven manually via registers `0x10`-`0x1B`. |
 | `0x01` | `LOADING` | Rotating loading pattern, one LED at a time reaching full brightness. **Default at power-on.** |
 | `0x02` | `BREATHING` | All LEDs smoothly fade in, hold, fade out and pause. |
+| `0x03` | `FOLLOWING` | Each 4 LEDs follow the encoder rotation (configurable with the `ANIMATION_FOLLOWING_LED_STEPS` constant). |
+| `0x04` | `POINT` | One LED follows the encoder rotation. |
+| `0x05` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The encoder count is capped between 0 and 100. |
 
 Animations write their brightness values to the LED registers (`0x10`-`0x1B`) and
 mark them dirty, so the main loop applies them exactly like host writes. The

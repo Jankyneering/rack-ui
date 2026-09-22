@@ -29,7 +29,7 @@ project using the Puya LL (Low Layer) driver library.
 | --- | --- | --- |
 | I2C SDA | PA2 | AF12, open-drain, pull-up, 100 kHz |
 | I2C SCL | PA3 | AF12, open-drain, pull-up, 100 kHz |
-| Encoder A | PA5 | EXTI falling edge, triggers count update (50 ms debounce) |
+| Encoder A | PA5 | EXTI edge(s) per `ENCODER_TRIGGER_TOGGLE`, triggers count update (1 ms glitch guard; lines are RC-debounced by 100 nF caps) |
 | Encoder B | PA4 | Input, sampled to determine rotation direction |
 | Encoder switch | PA0 | EXTI both edges, debounced press counter (50 ms) |
 | LED charlieplex X0 | PA6 | 12 LEDs across 4 pins |
@@ -174,6 +174,20 @@ Useful variants:
 make clean                        # remove build products
 V=1 make                          # verbose output (prints full command lines)
 ```
+
+Encoder build flags in `User/main.h`:
+
+- `ENCODER_TRIGGER_TOGGLE` (undefined by default) - define it to count both EncA
+  edges (one tick per detent on encoders that produce one edge per detent); leave it
+  commented out to count the falling edge only
+- `ENCODER_DIRECTION_FLIP` (undefined by default) - define it to make clockwise
+  rotation decrement the count instead of incrementing, for encoder models with
+  reversed phase wiring; composes with the runtime `CFG_ENC_DIR_FLIP` config bit
+- `ENCODER_AB_SWAP` (defined) - swap the phase inputs
+  (EncA moves to PA4, EncB to PA5) for encoder models whose trigger output sits on
+  the other phase or whose A/B pins are wired the other way round; note that
+  swapping the phases also inverts the decoded direction, so combine it with
+  `ENCODER_DIRECTION_FLIP` to keep the increment direction
 
 Output files land in `software/src/Build/`:
 

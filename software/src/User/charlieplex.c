@@ -98,6 +98,16 @@ static inline void charlie_apply_state(uint8_t state_index) {
         return;
     charlie_last_state       = state_index;
 
+    /* Ghost fix: OTYPER and ODR are two separate writes, and OTYPER-first
+     * forward-biases a third LED in between — the new anode is push-pull
+     * high at its old ODR level while the previous cathode is still driven
+     * low, so the LED bridging those two pins glows for the window between
+     * the writes (stretched whenever I2C/EXTI preempt this ISR inside it).
+     * Release every pin high first: one atomic BSRR store ends the old LED
+     * before any output type changes, so no intermediate state pairs a
+     * driven-high anode with a driven-low cathode. */
+    CHARLIE_GPIO->BSRR       = charlie_all_pins_mask;
+
     const charlie_state_t *s = &charlie_states[state_index];
     CHARLIE_GPIO->OTYPER     = (CHARLIE_GPIO->OTYPER & ~charlie_all_pins_mask) | s->otyper_bits;
     CHARLIE_GPIO->ODR        = (CHARLIE_GPIO->ODR & ~charlie_all_pins_mask) | s->odr_bits;

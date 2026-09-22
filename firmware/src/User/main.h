@@ -60,8 +60,12 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 
-/* Firmware version, exposed big-endian in registers 0x00-0x01 */
-#define FW_VERSION 0x0001u
+/* Firmware version, exposed big-endian in registers 0x00-0x01.
+ * Set through FW_VERSION in the Makefile (passed as a -D flag); the fallback
+ * matches the Makefile defaults and keeps IDE builds working. */
+#ifndef FW_VERSION
+#define FW_VERSION 0x0100u
+#endif
 #define HW_VERSION 0x0100u // hardware version, used for peripheral mapping and other hardware-specific behavior
 
 /* I2C slave address (7-bit) */

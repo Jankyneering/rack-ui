@@ -13,6 +13,7 @@ results. Without a display the suite still runs, console only.
 Usage: python3 test_suite.py [i2cdriver_serial_port]
 """
 
+import os
 import sys
 import time
 
@@ -44,7 +45,27 @@ CFG_PUSH_COUNT_DEC = 1 << 3
 CFG_PUSH_STATE_FLIP = 1 << 4
 CFG_LED_LINEAR = 1 << 5
 
-FW_VERSION = [0, 1]
+# Expected firmware version, read from the firmware Makefile if available
+# (set through FW_VERSION_MAJOR/FW_VERSION_MINOR, exposed big-endian in
+# registers 0x00-0x01). If the Makefile cannot be parsed the version step
+# falls back to reporting what the device reports.
+def read_fw_version():
+    makefile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "firmware", "src", "Makefile")
+    values = {}
+    try:
+        with open(makefile) as f:
+            for line in f:
+                if "?=" not in line:
+                    continue
+                key, value = line.split("?=", 1)
+                key = key.strip()
+                if key in ("FW_VERSION_MAJOR", "FW_VERSION_MINOR"):
+                    values[key] = value.strip()
+        return [int(values["FW_VERSION_MAJOR"]), int(values["FW_VERSION_MINOR"])]
+    except (OSError, KeyError, ValueError):
+        return None
+
+FW_VERSION = read_fw_version()
 
 ANIMATIONS = [
     (0x00, "IDLE", "LEDs are driven manually from registers 0x10-0x1B"),
@@ -219,6 +240,9 @@ def step_fw_version():
     version = read_regs(REG_FW_VERSION_HI, 2)
     print(f"  FW version registers 0x00-0x01: {version}")
     oled_msg(f"FW  {version[0]}.{version[1]:02d}")
+    if FW_VERSION is None:
+        print(f"  Firmware Makefile not found; device reports version {version[0]}.{version[1]:02d}")
+        return
     check(version == FW_VERSION, f"firmware version is {version}", f"unexpected firmware version {version} (expected {FW_VERSION})")
 
 
@@ -387,13 +411,14 @@ def step_animations():
 
 
 def step_soft_reset():
+    version_before = read_regs(REG_FW_VERSION_HI, 2)
     set_regs(REG_GP_BASE, [0xA5])
     print("  Writing 0x01 to register 0x00 issues a soft reset")
     oled_msg("resetting MCU...")
     set_reg(REG_SOFT_RESET, 0x01)
     time.sleep(0.5)
     version = read_regs(REG_FW_VERSION_HI, 2)
-    check(version == FW_VERSION, f"device back after reset (version {version})", f"no response after soft reset (version {version})")
+    check(version == version_before, f"device back after reset (version {version})", f"no response after soft reset (version {version}, before reset {version_before})")
     gp = read_regs(REG_GP_BASE, 1)
     check(gp == [0x00], "GP RAM back to power-on default 0x00", f"GP RAM after reset {gp}")
     anim = read_regs(REG_ANIMATION, 1)

@@ -54,7 +54,7 @@ starved by the display refresh.
 
 | Register | Access | Default | Description |
 | --- | --- | --- | --- |
-| `0x00`-`0x01` | R/W(see note) | `0x00 0x01` | **Read**: firmware version, 16-bit big-endian (BCD-friendly: v0.1 reads `0x0001`). **Write**: writing any non-zero value to `0x00` issues a soft reset (the version register is not writable; a zero write is ignored). |
+| `0x00`-`0x01` | R/W(see note) | `0x01 0x00` | **Read**: firmware version, 16-bit big-endian (BCD-friendly: v1.0 reads `0x0100`; set through `FW_VERSION_MAJOR`/`FW_VERSION_MINOR` in the Makefile). **Write**: writing any non-zero value to `0x00` issues a soft reset (the version register is not writable; a zero write is ignored). |
 | `0x02` | R/W | `0x00` | Configuration bits, see below. |
 | `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read if config bit 0 is set. |
 | `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
@@ -208,7 +208,7 @@ sudo apt-get install gcc-arm-none-eabi libnewlib-arm-none-eabi
 
 ### 2. Build
 
-From the `software/src` directory:
+From the `firmware/src` directory:
 
 ```bash
 make ARM_TOOLCHAIN=/usr/bin        # or point ARM_TOOLCHAIN at your toolchain's bin/ directory
@@ -219,6 +219,15 @@ Useful variants:
 ```bash
 make clean                        # remove build products
 V=1 make                          # verbose output (prints full command lines)
+make echo-version                 # print the firmware version (MAJOR.MINOR)
+```
+
+The firmware version is defined in the Makefile through `FW_VERSION_MAJOR` /
+`FW_VERSION_MINOR` (default 1.0); it is baked into registers `0x00`-`0x01` and
+names the build products. Override it for a local build with:
+
+```bash
+make ARM_TOOLCHAIN=/usr/bin FW_VERSION_MAJOR=2 FW_VERSION_MINOR=3
 ```
 
 Encoder build flags in `User/main.h`:
@@ -235,14 +244,15 @@ Encoder build flags in `User/main.h`:
   swapping the phases also inverts the decoded direction, so combine it with
   `ENCODER_DIRECTION_FLIP` to keep the increment direction
 
-Output files land in `software/src/Build/`:
+Output files land in `firmware/src/Build/`, named after the app and version
+(`mu-cell_rack-ui_vMAJOR.MINOR`):
 
 | File | Description |
 | --- | --- |
-| `app.bin` | Raw binary image, for flashing |
-| `app.hex` | Intel HEX image |
-| `app.elf` | ELF with debug symbols |
-| `app.lst` | Disassembly listing |
+| `mu-cell_rack-ui_vX.Y.bin` | Raw binary image, for flashing |
+| `mu-cell_rack-ui_vX.Y.hex` | Intel HEX image |
+| `mu-cell_rack-ui_vX.Y.elf` | ELF with debug symbols |
+| `mu-cell_rack-ui_vX.Y.lst` | Disassembly listing |
 
 ### 3. Flash
 
@@ -257,14 +267,17 @@ make ARM_TOOLCHAIN=/usr/bin FLASH_PROGRM=jlink flash
 Refer to the [py32f0-template wiki](https://github.com/IOsetting/py32f0-template/wiki)
 for detailed tooling setup (PyOCD, J-Link, VS Code debugging).
 
-## CI and nightly builds
+## CI and releases
 
 The [firmware workflow](../.github/workflows/firmware.yml) builds the firmware on every push
-to `main` and on pull requests, uploading the build outputs as an artifact. On each push to
-`main`, a **nightly** rolling release is published containing the latest `app.bin` (plus
-`.hex` and `.elf`), named with the commit it was built from. You can grab prebuilt binaries
-from the repository's [releases page](https://github.com/Jankyneering/rack-ui/releases)
-without installing a toolchain.
+to `main`, on pull requests and on `vX.Y` tags, uploading the build outputs as an artifact.
+On each push to `main`, a **nightly** rolling release is published containing the latest
+`.bin` (plus `.hex` and `.elf`), named `mu-cell_rack-ui_nightly-<commit>` with the commit it
+was built from. Pushing a `vX.Y` tag instead publishes a versioned release: the firmware is
+built with the tagged version and the assets are named `mu-cell_rack-ui_vX.Y.bin/.elf/.hex`.
+You can grab prebuilt binaries from the repository's
+[releases page](https://github.com/Jankyneering/rack-ui/releases) without installing a
+toolchain.
 
 ## License & Acknowledgements
 

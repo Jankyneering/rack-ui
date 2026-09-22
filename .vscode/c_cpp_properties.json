@@ -3,11 +3,11 @@
         {
             "name": "PY32F002A",
             "includePath": [
-                "${workspaceFolder}/software/src/User",
-                "${workspaceFolder}/software/src/Libraries/CMSIS/Core/Include",
-                "${workspaceFolder}/software/src/Libraries/CMSIS/Device/PY32F0xx/Include",
-                "${workspaceFolder}/software/src/Libraries/PY32F0xx_LL_Driver/Inc",
-                "${workspaceFolder}/software/src/Libraries/PY32F0xx_LL_BSP/Inc"
+                "${workspaceFolder}/firmware/src/User",
+                "${workspaceFolder}/firmware/src/Libraries/CMSIS/Core/Include",
+                "${workspaceFolder}/firmware/src/Libraries/CMSIS/Device/PY32F0xx/Include",
+                "${workspaceFolder}/firmware/src/Libraries/PY32F0xx_LL_Driver/Inc",
+                "${workspaceFolder}/firmware/src/Libraries/PY32F0xx_LL_BSP/Inc"
             ],
             "defines": [
                 "PY32F002Ax5",

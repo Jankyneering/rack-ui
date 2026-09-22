@@ -5,6 +5,11 @@ push button, LED brightness registers, GP RAM, soft reset) and cycles through
 every animation. Each step that needs user action displays the live encoder
 value and advances when the encoder push button is pressed and released.
 
+When the optional SSD1306 128x64 OLED is fitted, every step is mirrored on it:
+the top 16 pixel rows (the yellow band on two-color modules) show a title bar
+with the step counter, and the remaining area shows live values and PASS/FAIL
+results. Without a display the suite still runs, console only.
+
 Usage: python3 test_suite.py [i2cdriver_serial_port]
 """
 
@@ -12,6 +17,8 @@ import sys
 import time
 
 import i2cdriver
+
+import ssd1306
 
 PORT = "/dev/tty.usbserial-DM02V7KY"
 SLAVE_ADDR = 0x36
@@ -48,8 +55,17 @@ ANIMATIONS = [
 ]
 
 i2c = i2cdriver.I2CDriver(sys.argv[1] if len(sys.argv) > 1 else PORT)
+oled = ssd1306.probe(i2c)
+if oled is None:
+    print("No SSD1306 OLED found (optional board component); running console-only")
 
 failures = []
+checks_run = 0
+
+OLED_TITLE_ROWS = 16
+OLED_LINE_HEIGHT = 8
+OLED_STATUS_LINES = (ssd1306.HEIGHT - OLED_TITLE_ROWS) // OLED_LINE_HEIGHT
+oled_status_line = 0
 
 
 def set_reg(reg, value):
@@ -94,11 +110,59 @@ def get_push_count():
     return read_reg(REG_ENC_PUSH_COUNT)
 
 
+def oled_clear_status():
+    if oled is None:
+        return
+    oled.fill_rect(0, OLED_TITLE_ROWS, oled.width, oled.height - OLED_TITLE_ROWS, False)
+
+
+def oled_begin_step(step_no, total, title):
+    """Draw the title bar: the top 16 rows, inverted, with the step counter."""
+    global oled_status_line
+    if oled is None:
+        return
+    oled.clear()
+    oled.fill_rect(0, 0, oled.width, OLED_TITLE_ROWS, True)
+    counter = f"{step_no}/{total}"
+    counter_w = oled.text_width(counter)
+    title_chars = max(0, (oled.width - counter_w - 10) // 6)
+    title = title[:title_chars]
+    oled.text(2, 4, title, on=False)
+    oled.text(oled.width - counter_w - 2, 4, counter, on=False)
+    oled_status_line = 0
+    oled.flush()
+
+
+def oled_msg(text):
+    global oled_status_line
+    if oled is None:
+        return
+    if oled_status_line < OLED_STATUS_LINES:
+        oled.text(2, OLED_TITLE_ROWS + oled_status_line * OLED_LINE_HEIGHT, text[:21])
+        oled.flush()
+    oled_status_line += 1
+
+
+def oled_live(count, state, push_count, hint="PRESS TO CONT"):
+    if oled is None:
+        return
+    oled_clear_status()
+    oled.text(2, OLED_TITLE_ROWS + 0 * OLED_LINE_HEIGHT, f"ROT  {count:+6d}")
+    oled.text(2, OLED_TITLE_ROWS + 1 * OLED_LINE_HEIGHT, f"BTN  {state}")
+    oled.text(2, OLED_TITLE_ROWS + 2 * OLED_LINE_HEIGHT, f"CNT  {push_count:3d}")
+    oled.text(2, OLED_TITLE_ROWS + 5 * OLED_LINE_HEIGHT, hint)
+    oled.flush()
+
+
 def check(condition, ok_msg, fail_msg):
+    global checks_run
+    checks_run += 1
     if condition:
         print(f"  PASS: {ok_msg}")
+        oled_msg(f"PASS {ok_msg}")
     else:
         print(f"  FAIL: {fail_msg}")
+        oled_msg(f"FAIL {fail_msg}")
         failures.append(fail_msg)
     return condition
 
@@ -110,7 +174,7 @@ def wait_press_release(pressed_value=1, poll_s=0.02):
         time.sleep(poll_s)
 
 
-def live_encoder_display(note="", pressed_value=1, poll_s=0.02):
+def live_encoder_display(note="", pressed_value=1, hint="PRESS TO CONT", poll_s=0.02):
     """Show the live encoder rotation count and push state on one line until
     the push button is pressed and released. Returns the count at press time."""
     if note:
@@ -122,6 +186,7 @@ def live_encoder_display(note="", pressed_value=1, poll_s=0.02):
         count = get_encoder_count()
         state = get_push_state()
         push_count = get_push_count()
+        oled_live(count, state, push_count, hint)
         if state == pressed_value:
             pressed = True
         elif pressed:
@@ -137,6 +202,7 @@ def live_encoder_display(note="", pressed_value=1, poll_s=0.02):
 def step_fw_version():
     version = read_regs(REG_FW_VERSION_HI, 2)
     print(f"  FW version registers 0x00-0x01: {version}")
+    oled_msg(f"FW  {version[0]}.{version[1]:02d}")
     check(version == FW_VERSION, f"firmware version is {version}", f"unexpected firmware version {version} (expected {FW_VERSION})")
 
 
@@ -145,6 +211,7 @@ def step_gp_ram():
     set_regs(REG_GP_BASE, pattern)
     readback = read_regs(REG_GP_BASE, len(pattern))
     print(f"  GP RAM 0x20 write {pattern}, read back {readback}")
+    oled_msg(f"RAM {' '.join(f'{v:02X}' for v in readback)}")
     check(readback == pattern, "GP RAM readback matches", "GP RAM readback mismatch")
 
     set_reg(0x08, 0xFF)
@@ -160,13 +227,16 @@ def step_gp_ram():
 def step_led_registers():
     set_reg(REG_ANIMATION, 0x00)
     print("  Animation set to IDLE so the LED registers drive the LEDs directly")
+    oled_msg("IDLE animation set")
     print("  LED chase: each of the 12 LEDs lights up in turn")
+    oled_msg("LED chase...")
     for led in range(REG_LED_COUNT):
         set_regs(REG_LED_BASE, [63 if i == led else 0 for i in range(REG_LED_COUNT)])
         time.sleep(0.12)
     set_regs(REG_LED_BASE, [0] * REG_LED_COUNT)
 
     print("  Brightness ramp on all LEDs (0 to 63 and back)")
+    oled_msg("LED ramp...")
     for brightness in list(range(0, 64, 4)) + list(range(63, -1, -4)):
         set_regs(REG_LED_BASE, [brightness] * REG_LED_COUNT)
         time.sleep(0.03)
@@ -180,10 +250,12 @@ def step_gamma_linear():
     set_reg(REG_CONFIG, 0x00)
     set_regs(REG_LED_BASE, [32] * REG_LED_COUNT)
     print("  All LEDs at register value 32, gamma-corrected (dimmer, perceptual)")
+    oled_msg("GAMMA 32")
     wait_press_release()
 
     set_reg(REG_CONFIG, CFG_LED_LINEAR)
     print("  Same value 32 with CFG_LED_LINEAR (visually brighter, linear PWM)")
+    oled_msg("LINEAR 32")
     wait_press_release()
     set_regs(REG_LED_BASE, [0] * REG_LED_COUNT)
     set_reg(REG_CONFIG, 0x00)
@@ -198,23 +270,28 @@ def step_rot_reset_on_read():
     set_reg(REG_CONFIG, CFG_ROT_RESET_ON_READ)
     print("  CFG_ROT_RESET_ON_READ set: the count clears to 0 after every read")
     print("  Keep rotating: the value jumps back to 0 each time it is read")
-    live_encoder_display()
+    live_encoder_display(hint="RESET ON READ")
+
+
     set_reg(REG_CONFIG, 0x00)
     print("  Config restored to 0x00")
+    oled_msg("config restored")
 
 
 def step_push_count():
     print("  Default mode: push count increments on every press (wraps past 255)")
     print("  Press the encoder button a few times and watch the count go up")
+    oled_msg("press to count up")
     live_encoder_display()
     count = get_push_count()
     check(count != 0, f"push count registered presses (now {count})", "push count never incremented")
 
     set_reg(REG_CONFIG, CFG_PUSH_RESET_ON_READ)
     print("  CFG_PUSH_RESET_ON_READ set: the count clears to 0 after every read")
-    live_encoder_display()
+    live_encoder_display(hint="RESET ON READ")
     set_reg(REG_CONFIG, 0x00)
     print("  Config restored to 0x00")
+    oled_msg("config restored")
 
 
 def step_push_count_dec():
@@ -222,27 +299,31 @@ def step_push_count_dec():
     set_reg(REG_CONFIG, CFG_PUSH_COUNT_DEC)
     print("  Push count preset to 5, CFG_PUSH_COUNT_DEC set: presses now count DOWN")
     print("  Press the encoder button and watch it decrement (saturates at 0)")
+    oled_msg("press to count down")
     live_encoder_display()
     set_reg(REG_CONFIG, 0x00)
     print("  Config restored to 0x00")
+    oled_msg("config restored")
 
 
 def step_push_state_flip():
     set_reg(REG_CONFIG, CFG_PUSH_STATE_FLIP)
     print("  CFG_PUSH_STATE_FLIP set: state shows 1 while released and 0 while pressed")
     print("  The step ends on a press, so expect the display to read 0 right before it ends")
-    live_encoder_display(pressed_value=0)
+    live_encoder_display(pressed_value=0, hint="FLIPPED: RELEASE")
     set_reg(REG_CONFIG, 0x00)
     print("  Config restored to 0x00")
+    oled_msg("config restored")
 
 
 def step_enc_dir_flip():
     set_reg(REG_CONFIG, CFG_ENC_DIR_FLIP)
     print("  CFG_ENC_DIR_FLIP set: rotation direction is inverted")
     print("  Rotate both ways: clockwise should now decrement the count")
-    live_encoder_display()
+    live_encoder_display(hint="DIRECTION FLIP")
     set_reg(REG_CONFIG, 0x00)
     print("  Config restored to 0x00")
+    oled_msg("config restored")
 
 
 def step_animations():
@@ -258,12 +339,14 @@ def step_animations():
         set_reg(REG_ANIMATION, anim_id)
         readback = read_regs(REG_ANIMATION, 1)
         check(readback == [anim_id], f"animation {name} selected", f"animation register readback {readback} for {name}")
+        oled_msg(f"0x{anim_id:02X} {name}")
         live_encoder_display()
 
 
 def step_soft_reset():
     set_regs(REG_GP_BASE, [0xA5])
     print("  Writing 0x01 to register 0x00 issues a soft reset")
+    oled_msg("resetting MCU...")
     set_reg(REG_SOFT_RESET, 0x01)
     time.sleep(0.5)
     version = read_regs(REG_FW_VERSION_HI, 2)
@@ -292,15 +375,48 @@ STEPS = [
 ]
 
 
+def oled_results_screen(total_checks, passed_checks):
+    if oled is None:
+        return
+    oled.clear()
+    oled.fill_rect(0, 0, oled.width, OLED_TITLE_ROWS, True)
+    oled.text(2, 4, "RESULTS", on=False)
+    oled.text(2, OLED_TITLE_ROWS + 0 * OLED_LINE_HEIGHT, f"CHECKS {passed_checks}/{total_checks}")
+    if failures:
+        oled.text(2, OLED_TITLE_ROWS + 1 * OLED_LINE_HEIGHT, f"FAILED {len(failures)}")
+        for i, failure in enumerate(failures[: OLED_STATUS_LINES - 2]):
+            oled.text(2, OLED_TITLE_ROWS + (2 + i) * OLED_LINE_HEIGHT, f"- {failure}"[:21])
+    else:
+        oled.text(2, OLED_TITLE_ROWS + 1 * OLED_LINE_HEIGHT, "ALL CHECKS PASSED")
+        oled.text_centered(OLED_TITLE_ROWS + 4 * OLED_LINE_HEIGHT, "TEST COMPLETE")
+    oled.flush()
+
+
 def main():
     print("rack-ui interactive test suite")
     print(f"I2C slave address: 0x{SLAVE_ADDR:02X}")
+    oled_begin_step(0, len(STEPS), "RACK-UI TEST")
+    oled_msg(f"MCU @ 0x{SLAVE_ADDR:02X}")
+    if oled is not None:
+        oled_msg(f"OLED @ 0x{oled.address:02X}")
+    oled_msg("press encoder to")
+    oled_msg("advance each step")
     try:
         for index, (title, func) in enumerate(STEPS, 1):
             print("\n" + "=" * 70)
             print(f" Step {index}/{len(STEPS)}: {title}")
             print("=" * 70)
+            before = len(failures)
+            oled_begin_step(index, len(STEPS), title)
             func()
+            step_failures = len(failures) - before
+            if oled is not None:
+                oled.text(
+                    oled.width - 30,
+                    OLED_TITLE_ROWS + (OLED_STATUS_LINES - 1) * OLED_LINE_HEIGHT,
+                    "STEP FAIL" if step_failures else "STEP OK",
+                )
+                oled.flush()
     except KeyboardInterrupt:
         print("\nAborted by user")
     finally:
@@ -317,6 +433,7 @@ def main():
     else:
         print(" All checks passed")
     print("=" * 70)
+    oled_results_screen(checks_run, checks_run - len(failures))
 
 
 if __name__ == "__main__":

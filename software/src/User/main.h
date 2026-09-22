@@ -68,33 +68,33 @@ extern "C" {
 #define I2C_SLAVE_ADDR 0x36
 
 /* Register map */
-#define REG_COUNT            256  /* 0x00-0xFF, one byte each */
-#define REG_FW_VERSION_HI   0x00 /* R/O: firmware version, high byte */
-#define REG_SOFT_RESET      0x00 /* W: command register (same address as version hi):
-                                     writing any non-zero value soft-resets the MCU */
-#define REG_FW_VERSION_LO   0x01 /* R/O: firmware version, low byte */
-#define REG_CONFIG           0x02 /* R/W: configuration bits, default 0x00 */
-#define REG_ENC_COUNT_HI     0x03 /* R/W: encoder rotation count, high byte */
-#define REG_ENC_COUNT_LO     0x04 /* R/W: encoder rotation count, low byte */
-#define REG_ENC_PUSH_COUNT   0x05 /* R/W: encoder push button count */
-#define REG_ENC_PUSH_STATE   0x06 /* R/O: encoder push button state */
-#define REG_ANIMATION         0x0F /* R/W: active animation, see animations.h:
-                                     0x00 = IDLE (custom control over the LEDs),
-                                     0x01 = LOADING (default), 0x02 = BREATHING, ... */
+#define REG_COUNT 256           /* 0x00-0xFF, one byte each */
+#define REG_FW_VERSION_HI 0x00  /* R/O: firmware version, high byte */
+#define REG_SOFT_RESET 0x00     /* W: command register (same address as version hi): \
+                                    writing any non-zero value soft-resets the MCU */
+#define REG_FW_VERSION_LO 0x01  /* R/O: firmware version, low byte */
+#define REG_CONFIG 0x02         /* R/W: configuration bits, default 0x00 */
+#define REG_ENC_COUNT_HI 0x03   /* R/W: encoder rotation count, high byte */
+#define REG_ENC_COUNT_LO 0x04   /* R/W: encoder rotation count, low byte */
+#define REG_ENC_PUSH_COUNT 0x05 /* R/W: encoder push button count */
+#define REG_ENC_PUSH_STATE 0x06 /* R/O: encoder push button state */
+#define REG_ANIMATION 0x0F      /* R/W: active animation, see animations.h:   \
+                                  0x00 = IDLE (custom control over the LEDs), \
+                                  0x01 = LOADING (default), 0x02 = BREATHING, ... */
 /* 0x08-0x0E: reserved, reads as 0x00, writes ignored */
-#define REG_LED_BASE         0x10 /* R/W: LED brightness, one register per LED */
-#define REG_LED_COUNT        12   /* 0x10-0x1B */
+#define REG_LED_BASE 0x10 /* R/W: LED brightness, one register per LED */
+#define REG_LED_COUNT 12  /* 0x10-0x1B */
 /* 0x1C-0x1F: reserved, reads as 0x00, writes ignored */
-#define REG_GP_BASE          0x20 /* R/W: general-purpose I2C RAM */
-#define REG_GP_DEFAULT       0x00
+#define REG_GP_BASE 0x20 /* R/W: general-purpose I2C RAM */
+#define REG_GP_DEFAULT 0x00
 
 /* REG_CONFIG bit definitions */
-#define CFG_ROT_RESET_ON_READ  (1u << 0) /* 1: reset rotation count after its low byte is read */
+#define CFG_ROT_RESET_ON_READ (1u << 0)  /* 1: reset rotation count after its low byte is read */
 #define CFG_PUSH_RESET_ON_READ (1u << 1) /* 1: reset push count after it is read */
-#define CFG_ENC_DIR_FLIP       (1u << 2) /* 1: flip encoder increment direction */
-#define CFG_PUSH_COUNT_DEC     (1u << 3) /* 1: decrement push count on press, 0: increment */
-#define CFG_PUSH_STATE_FLIP    (1u << 4) /* 1: invert reported push button state */
-#define CFG_LED_LINEAR         (1u << 5) /* 0: gamma-correct LED brightness, 1: linear */
+#define CFG_ENC_DIR_FLIP (1u << 2)       /* 1: flip encoder increment direction */
+#define CFG_PUSH_COUNT_DEC (1u << 3)     /* 1: decrement push count on press, 0: increment */
+#define CFG_PUSH_STATE_FLIP (1u << 4)    /* 1: invert reported push button state */
+#define CFG_LED_LINEAR (1u << 5)         /* 0: gamma-correct LED brightness, 1: linear */
 /* bits 6-7: reserved, always read 0 */
 
 /* Encoder trigger mode:
@@ -102,31 +102,31 @@ extern "C" {
  *             with one full quadrature cycle per detent)
  * defined   - count on both EncA edges (1 tick per detent on encoders with one
  *             EncA edge per detent, e.g. 36-detent parts showing only 18 ticks) */
-#define ENCODER_TRIGGER_TOGGLE
+// #define ENCODER_TRIGGER_TOGGLE
 
 /* Compile-time default for the increment direction, for swapping encoder
  * models with reversed phase wiring (or mounting). undefined - clockwise
  * rotation increments the count; defined - clockwise decrements. The host
  * can still flip direction at runtime via REG_CONFIG bit CFG_ENC_DIR_FLIP;
  * the two compose (both set = net unchanged). */
-/* #define ENCODER_DIRECTION_FLIP */
+// #define ENCODER_DIRECTION_FLIP
 
 /* Swap the encoder phase inputs: EncA moves to PA4, EncB to PA5, for encoder
  * models whose trigger output sits on the other phase (or whose A/B pins are
  * wired the other way round). Note that swapping the phases also inverts the
  * decoded direction; combine with ENCODER_DIRECTION_FLIP to compensate. */
-/* #define ENCODER_AB_SWAP */
+#define ENCODER_AB_SWAP
 
 #ifdef ENCODER_AB_SWAP
-#define ENC_A_PIN           LL_GPIO_PIN_4
-#define ENC_A_EXTI_LINE     LL_EXTI_LINE_4
-#define ENC_A_EXTI_SOURCE   LL_EXTI_CONFIG_LINE4
-#define ENC_B_PIN           LL_GPIO_PIN_5
+#define ENC_A_PIN LL_GPIO_PIN_4
+#define ENC_A_EXTI_LINE LL_EXTI_LINE_4
+#define ENC_A_EXTI_SOURCE LL_EXTI_CONFIG_LINE4
+#define ENC_B_PIN LL_GPIO_PIN_5
 #else
-#define ENC_A_PIN           LL_GPIO_PIN_5
-#define ENC_A_EXTI_LINE     LL_EXTI_LINE_5
-#define ENC_A_EXTI_SOURCE   LL_EXTI_CONFIG_LINE5
-#define ENC_B_PIN           LL_GPIO_PIN_4
+#define ENC_A_PIN LL_GPIO_PIN_5
+#define ENC_A_EXTI_LINE LL_EXTI_LINE_5
+#define ENC_A_EXTI_SOURCE LL_EXTI_CONFIG_LINE5
+#define ENC_B_PIN LL_GPIO_PIN_4
 #endif
 
 /* Exported macro ------------------------------------------------------------*/

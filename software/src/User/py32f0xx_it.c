@@ -181,6 +181,11 @@ void EXTI4_15_IRQHandler(void) {
 #else
             int8_t delta = enc_b ? 1 : -1;
 #endif
+#ifdef ENCODER_DIRECTION_FLIP
+            /* Compile-time default direction for the encoder model; composes
+             * with the runtime CFG_ENC_DIR_FLIP config bit (both set cancel). */
+            delta = -delta;
+#endif
             if (device_memory[REG_CONFIG] & CFG_ENC_DIR_FLIP)
                 delta = -delta;
 

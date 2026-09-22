@@ -175,9 +175,14 @@ make clean                        # remove build products
 V=1 make                          # verbose output (prints full command lines)
 ```
 
-To count both EncA edges instead of the falling edge only (for encoders that produce
-one edge per detent), define `ENCODER_TRIGGER_TOGGLE` in `User/main.h`; comment the
-`#define` out to restore falling-edge-only counting.
+Encoder build flags in `User/main.h`:
+
+- `ENCODER_TRIGGER_TOGGLE` (defined) - count both EncA edges (one tick per detent on
+  encoders that produce one edge per detent); comment the `#define` out to count the
+  falling edge only
+- `ENCODER_DIRECTION_FLIP` (undefined by default) - define it to make clockwise
+  rotation decrement the count instead of incrementing, for encoder models with
+  reversed phase wiring; composes with the runtime `CFG_ENC_DIR_FLIP` config bit
 
 Output files land in `software/src/Build/`:
 

@@ -104,6 +104,13 @@ extern "C" {
  *             EncA edge per detent, e.g. 36-detent parts showing only 18 ticks) */
 #define ENCODER_TRIGGER_TOGGLE
 
+/* Compile-time default for the increment direction, for swapping encoder
+ * models with reversed phase wiring (or mounting). undefined - clockwise
+ * rotation increments the count; defined - clockwise decrements. The host
+ * can still flip direction at runtime via REG_CONFIG bit CFG_ENC_DIR_FLIP;
+ * the two compose (both set = net unchanged). */
+/* #define ENCODER_DIRECTION_FLIP */
+
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions prototypes ---------------------------------------------*/
 void APP_ErrorHandler(void);

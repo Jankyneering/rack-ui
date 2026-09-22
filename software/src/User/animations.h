@@ -37,23 +37,27 @@ typedef enum {
     ANIMATION_FOLLOWING = 0x80, /* LEDs follow the encoder rotation (one LED per detent) */
     ANIMATION_POINT     = 0x81, /* one LED lights up at a time, moving with the encoder rotation */
     ANIMATION_GAUGE     = 0x82, /* LEDs light up in a gauge pattern based on the encoder rotation */
+
+    ANIMATION_ALL_ON    = 0xFE, /* all LEDs on */
+    ANIMATION_ALL_OFF   = 0xFF, /* all LEDs off */
     /* Add new animations here, then register them in the animation table in
      * animations.c. */
 } Animation_Id_t;
 
-#define ANIMATION_DEFAULT ANIMATION_PULSING
+#define ANIMATION_DEFAULT ANIMATION_ALL_ON
 
 /* Animation settings. */
-#define ANIMATION_TICK_MS 11              // Animation engine tick, driven from the main loop.
+#define ANIMATION_TICK_MS 11 // Animation engine tick, driven from the main loop.
 
 /* Defaults loaded into register 0x0F (REG_ANIMATION_SETTINGS) when the
  * matching animation is selected through register 0x0E. The register value
  * is the timing setting: 0-255, in tens of milliseconds for LOADING and
  * FLASHING, in milliseconds for PULSING. A value of 0 keeps the previous
  * setting. */
-#define ANIMATION_LOADING_SETTINGS_DEFAULT 10   // 10 * 10 ms = 100 ms between LED steps.
-#define ANIMATION_FLASHING_SETTINGS_DEFAULT 25  // 25 * 10 ms = 250 ms between LED state toggles.
-#define ANIMATION_PULSING_SETTINGS_DEFAULT 10   // 10 ms between LED brightness changes.
+#define ANIMATION_LOADING_SETTINGS_DEFAULT 10                   // 10 * 10 ms = 100 ms between LED steps.
+#define ANIMATION_FLASHING_SETTINGS_DEFAULT 25                  // 25 * 10 ms = 250 ms between LED state toggles.
+#define ANIMATION_PULSING_SETTINGS_DEFAULT 10                   // 10 ms between LED brightness changes.
+#define ANIMATION_ALL_ON_SETTINGS_DEFAULT CHARLIE_PWM_STEPS - 1 // Default max brightness for all-on animation (0--CHARLIE_PWM_STEPS-1).
 
 /* Animation settings register scaling, in ms per register step. */
 #define ANIMATION_LOADING_SETTINGS_MS 10

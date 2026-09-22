@@ -55,6 +55,11 @@ static void Animation_Point_Step(void);
 static void Animation_Gauge_Start(void);
 static void Animation_Gauge_Step(void);
 
+static void Animation_All_On_Start(void);
+static void Animation_All_On_Step(void);
+static void Animation_All_Off_Start(void);
+static void Animation_All_Off_Step(void);
+
 static const Animation_Entry_t animation_table[] = {
     {ANIMATION_IDLE, Animation_Idle_Start, Animation_Idle_Step},
     {ANIMATION_LOADING, Animation_Loading_Start, Animation_Loading_Step},
@@ -65,6 +70,8 @@ static const Animation_Entry_t animation_table[] = {
     {ANIMATION_FOLLOWING, Animation_Following_Start, Animation_Following_Step},
     {ANIMATION_POINT, Animation_Point_Start, Animation_Point_Step},
     {ANIMATION_GAUGE, Animation_Gauge_Start, Animation_Gauge_Step},
+    {ANIMATION_ALL_ON, Animation_All_On_Start, Animation_All_On_Step},
+    {ANIMATION_ALL_OFF, Animation_All_Off_Start, Animation_All_Off_Step},
 };
 
 static const Animation_Entry_t *active_animation = &animation_table[0];
@@ -80,6 +87,8 @@ static uint8_t Animation_SettingsDefault(uint8_t id) {
         return ANIMATION_FLASHING_SETTINGS_DEFAULT;
     case ANIMATION_PULSING:
         return ANIMATION_PULSING_SETTINGS_DEFAULT;
+    case ANIMATION_ALL_ON:
+        return ANIMATION_ALL_ON_SETTINGS_DEFAULT;
     default:
         return 0;
     }
@@ -471,4 +480,38 @@ static void Animation_Gauge_Step(void) {
 
     // Mark the registers as dirty so that the main loop applies the changes
     APP_MarkRegsDirty();
+}
+
+/**
+ * @brief Turn all LEDs on at set brightness.
+ */
+static void Animation_All_On_Start(void) {
+    for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+        device_memory[REG_LED_BASE + i] = Animations_GetSettings(); // Use the current animation settings for brightness
+    }
+    APP_MarkRegsDirty();
+
+    // go back to idle after turning all LEDs on
+    Animations_Set(ANIMATION_IDLE);
+}
+static void Animation_All_On_Step(void) {
+    // No step needed for all-on animation; it's a one-time action.
+    Animations_Set(ANIMATION_IDLE);
+}
+
+/**
+ * @brief Turn all LEDs off.
+ */
+static void Animation_All_Off_Start(void) {
+    for (uint8_t i = 0; i < ANIMATION_LED_COUNT; i++) {
+        device_memory[REG_LED_BASE + i] = 0;
+    }
+    APP_MarkRegsDirty();
+
+    // go back to idle after turning all LEDs off
+    Animations_Set(ANIMATION_IDLE);
+}
+static void Animation_All_Off_Step(void) {
+    // No step needed for all-off animation; it's a one-time action.
+    Animations_Set(ANIMATION_IDLE);
 }

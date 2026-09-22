@@ -32,7 +32,9 @@ static bool reg_is_writable(uint8_t reg) {
         return true;
     if (reg >= REG_ENC_COUNT_HI && reg <= REG_ENC_PUSH_COUNT) // 0x03-0x05
         return true;
-    if (reg == REG_ANIMATION) // 0x0F
+    if (reg == REG_ANIMATION) // 0x0E
+        return true;
+    if (reg == REG_ANIMATION_SETTINGS) // 0x0F
         return true;
     if (reg >= REG_LED_BASE && reg < REG_LED_BASE + REG_LED_COUNT) // 0x10-0x1B
         return true;
@@ -127,6 +129,8 @@ void I2C1_IRQHandler(void) {
                     }
                     if (current_reg_ptr == REG_ANIMATION)
                         Animations_Set(data); // switch the active animation
+                    if (current_reg_ptr == REG_ANIMATION_SETTINGS)
+                        Animations_SetSettings(data); // update the animation timing
                 }
                 current_reg_ptr++; // advance pointer even for ignored writes
             }

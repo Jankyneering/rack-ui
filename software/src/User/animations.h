@@ -3,10 +3,14 @@
  * @file    animations.h
  * @brief   LED animation engine for the Charlieplex LEDs.
  *
- * The active animation is selected through register 0x0F (REG_ANIMATION):
+ * The active animation is selected through register 0x0E (REG_ANIMATION):
  *   0x00 = IDLE     : custom control over the LEDs via registers 0x10-0x1B
- *   0x01 = LOADING  : rotating loading animation (default)
- *   0x02 = BREATHING: all LEDs smoothly fade in and out
+ *   0x01 = LOADING  : rotating loading animation
+ *   0x02 = FLASHING : all LEDs flash on and off
+ *   0x03 = PULSING  : all LEDs pulse in brightness
+ *   0x04 = BREATHING: all LEDs smoothly fade in and out
+ * Register 0x0F (REG_ANIMATION_SETTINGS) holds the timing setting of the
+ *   selected animation; writing REG_ANIMATION loads that animation's default.
  *   ...add new animations by extending Animation_Id_t and the table in
  *   animations.c.
  ******************************************************************************
@@ -22,12 +26,12 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-/* Animation IDs, matching the values written to register 0x0F. */
+/* Animation IDs, matching the values written to register 0x0E. */
 typedef enum {
     ANIMATION_IDLE      = 0x00, /* LEDs are driven manually through registers 0x10-0x1B */
-    ANIMATION_LOADING   = 0x01, /* rotating loading pattern (default) */
+    ANIMATION_LOADING   = 0x01, /* rotating loading pattern */
     ANIMATION_FLASHING  = 0x02, /* all LEDs flash on and off */
-    ANIMATION_PULSING   = 0x03, /* all LEDs pulse in brightness */
+    ANIMATION_PULSING   = 0x03, /* all LEDs pulse in brightness (default) */
     ANIMATION_BREATHING = 0x04, /* all LEDs fade in and out */
 
     ANIMATION_FOLLOWING = 0x80, /* LEDs follow the encoder rotation (one LED per detent) */
@@ -41,9 +45,21 @@ typedef enum {
 
 /* Animation settings. */
 #define ANIMATION_TICK_MS 11              // Animation engine tick, driven from the main loop.
-#define ANIMATION_LOADING_TICK_MS 100     // Time between LED steps in the loading animation.
-#define ANIMATION_FLASHING_TICK_MS 250    // Time between LED state toggles in the flashing animation.
-#define ANIMATION_PULSING_TICK_MS 10     // Time between LED brightness changes in the pulsing animation.
+
+/* Defaults loaded into register 0x0F (REG_ANIMATION_SETTINGS) when the
+ * matching animation is selected through register 0x0E. The register value
+ * is the timing setting: 0-255, in tens of milliseconds for LOADING and
+ * FLASHING, in milliseconds for PULSING. A value of 0 keeps the previous
+ * setting. */
+#define ANIMATION_LOADING_SETTINGS_DEFAULT 10   // 10 * 10 ms = 100 ms between LED steps.
+#define ANIMATION_FLASHING_SETTINGS_DEFAULT 25  // 25 * 10 ms = 250 ms between LED state toggles.
+#define ANIMATION_PULSING_SETTINGS_DEFAULT 10   // 10 ms between LED brightness changes.
+
+/* Animation settings register scaling, in ms per register step. */
+#define ANIMATION_LOADING_SETTINGS_MS 10
+#define ANIMATION_FLASHING_SETTINGS_MS 10
+#define ANIMATION_PULSING_SETTINGS_MS 1
+
 #define ANIMATION_BREATHING_IN_MS 1500    // Time for LEDs to fade in during the breathing animation.
 #define ANIMATION_BREATHING_HOLD_MS 750   // Time to hold full brightness during the breathing animation.
 #define ANIMATION_BREATHING_OUT_MS 2500   // Time for LEDs to fade out during the breathing animation.
@@ -61,8 +77,11 @@ void Animations_Init(void);
 /* Select the active animation. Unknown values fall back to ANIMATION_IDLE. */
 void Animations_Set(uint8_t id);
 
-/* Current animation value, as exposed in register 0x0F. */
+/* Current animation value, as exposed in register 0x0E. */
 uint8_t Animations_Get(void);
+
+/* Timing setting of the current animation, as exposed in register 0x0F. */
+uint8_t Animations_GetSettings(void);
 
 /* Advance the active animation. Called from the main loop at a fixed
  * interval; the engine keeps its own tick timing internally. */

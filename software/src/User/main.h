@@ -78,10 +78,14 @@ extern "C" {
 #define REG_ENC_COUNT_LO 0x04   /* R/W: encoder rotation count, low byte */
 #define REG_ENC_PUSH_COUNT 0x05 /* R/W: encoder push button count */
 #define REG_ENC_PUSH_STATE 0x06 /* R/O: encoder push button state */
-#define REG_ANIMATION 0x0F      /* R/W: active animation, see animations.h:   \
+#define REG_ANIMATION 0x0E      /* R/W: active animation, see animations.h:   \
                                   0x00 = IDLE (custom control over the LEDs), \
-                                  0x01 = LOADING (default), 0x02 = BREATHING, ... */
-/* 0x08-0x0E: reserved, reads as 0x00, writes ignored */
+                                  0x01 = LOADING, 0x02 = FLASHING, ... */
+#define REG_ANIMATION_SETTINGS 0x0F /* R/W: timing setting of the animation \
+                                  selected through REG_ANIMATION, see animations.h. \
+                                  Writing REG_ANIMATION loads the new animation's \
+                                  default into this register. */
+/* 0x08-0x0D: reserved, reads as 0x00, writes ignored */
 #define REG_LED_BASE 0x10 /* R/W: LED brightness, one register per LED */
 #define REG_LED_COUNT 12  /* 0x10-0x1B */
 /* 0x1C-0x1F: reserved, reads as 0x00, writes ignored */

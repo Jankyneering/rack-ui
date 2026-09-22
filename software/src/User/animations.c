@@ -3,10 +3,12 @@
  * @file    animations.c
  * @brief   LED animation engine for the Charlieplex LEDs.
  *
- * The active animation is selected through register 0x0F (REG_ANIMATION):
+ * The active animation is selected through register 0x0E (REG_ANIMATION):
  *   0x00 = IDLE     : custom control over the LEDs via registers 0x10-0x1B
- *   0x01 = LOADING  : rotating loading animation (default)
- *   0x02 = BREATHING: all LEDs smoothly fade in and out
+ *   0x01 = LOADING  : rotating loading animation
+ *   0x02 = FLASHING : all LEDs flash on and off
+ * Register 0x0F (REG_ANIMATION_SETTINGS) holds the timing setting of the
+ *   selected animation; writing REG_ANIMATION loads that animation's default.
  ******************************************************************************
  */
 
@@ -20,7 +22,7 @@ extern volatile uint8_t device_memory[REG_COUNT];
 typedef void (*Animation_Start_Fn_t)(void);
 typedef void (*Animation_Step_Fn_t)(void);
 
-/* One entry per animation exposed through register 0x0F. To add a new
+/* One entry per animation exposed through register 0x0E. To add a new
  * animation: give it an ID in Animation_Id_t, implement its start/step
  * functions and append an entry here. */
 typedef struct {
@@ -28,6 +30,11 @@ typedef struct {
     Animation_Start_Fn_t start;
     Animation_Step_Fn_t step;
 } Animation_Entry_t;
+
+/* Timing setting (register 0x0F) of the active animation and its scale, in ms
+ * per register step. A scale of 0 means the register is ignored. */
+static uint8_t animation_settings = 0;
+static uint8_t animation_settings_ms = 0;
 
 static const Animation_Entry_t *Animation_Find(uint8_t id);
 static void Animation_Idle_Start(void);
@@ -63,9 +70,44 @@ static const Animation_Entry_t animation_table[] = {
 static const Animation_Entry_t *active_animation = &animation_table[0];
 static uint8_t current_id = ANIMATION_IDLE;
 
+/* Default timing setting (register 0x0F) for a given animation id: the value
+ * written to REG_ANIMATION_SETTINGS when the animation is selected. */
+static uint8_t Animation_SettingsDefault(uint8_t id) {
+    switch (id) {
+    case ANIMATION_LOADING:
+        return ANIMATION_LOADING_SETTINGS_DEFAULT;
+    case ANIMATION_FLASHING:
+        return ANIMATION_FLASHING_SETTINGS_DEFAULT;
+    case ANIMATION_PULSING:
+        return ANIMATION_PULSING_SETTINGS_DEFAULT;
+    default:
+        return 0;
+    }
+}
+
+static uint8_t Animation_SettingsMs(uint8_t id) {
+    switch (id) {
+    case ANIMATION_LOADING:
+        return ANIMATION_LOADING_SETTINGS_MS;
+    case ANIMATION_FLASHING:
+        return ANIMATION_FLASHING_SETTINGS_MS;
+    case ANIMATION_PULSING:
+        return ANIMATION_PULSING_SETTINGS_MS;
+    default:
+        return 0;
+    }
+}
+
+static uint32_t Animation_SettingsTickMs(void) {
+    return (uint32_t)animation_settings * animation_settings_ms;
+}
+
 void Animations_Init(void) {
     current_id = ANIMATION_DEFAULT;
     active_animation = Animation_Find(ANIMATION_DEFAULT);
+    animation_settings = Animation_SettingsDefault(current_id);
+    animation_settings_ms = Animation_SettingsMs(current_id);
+    device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
     active_animation->start();
 }
 
@@ -78,6 +120,23 @@ void Animations_Set(uint8_t id) {
         active_animation = entry;
         entry->start();
     }
+    animation_settings = Animation_SettingsDefault(id);
+    animation_settings_ms = Animation_SettingsMs(id);
+    device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
+}
+
+void Animations_SetSettings(uint8_t settings) {
+    if (settings == 0) {
+        // 0 keeps the current setting; undo the ISR's register write
+        device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
+        return;
+    }
+    animation_settings = settings;
+    device_memory[REG_ANIMATION_SETTINGS] = animation_settings;
+}
+
+uint8_t Animations_GetSettings(void) {
+    return animation_settings;
 }
 
 uint8_t Animations_Get(void) {
@@ -136,7 +195,8 @@ static void Animation_Loading_Start(void) {
 }
 
 static void Animation_Loading_Step(void) {
-    if ((sys_tick_ms - last_loading_tick) >= ANIMATION_LOADING_TICK_MS) {
+    uint32_t tick_ms = Animation_SettingsTickMs();
+    if (tick_ms > 0 && (sys_tick_ms - last_loading_tick) >= tick_ms) {
         last_loading_tick = sys_tick_ms;
 
         loading_current_led = (loading_current_led + 1) % ANIMATION_LED_COUNT;
@@ -165,7 +225,8 @@ static void Animation_Flashing_Start(void) {
 }
 
 static void Animation_Flashing_Step(void) {
-    if ((sys_tick_ms - last_flashing_tick) >= ANIMATION_FLASHING_TICK_MS) {
+    uint32_t tick_ms = Animation_SettingsTickMs();
+    if (tick_ms > 0 && (sys_tick_ms - last_flashing_tick) >= tick_ms) {
         last_flashing_tick = sys_tick_ms;
 
         flashing_state = !flashing_state;
@@ -195,7 +256,8 @@ static void Animation_Pulsing_Start(void) {
 }
 
 static void Animation_Pulsing_Step(void) {
-    if ((sys_tick_ms - last_pulsing_tick) >= ANIMATION_PULSING_TICK_MS) {
+    uint32_t tick_ms = Animation_SettingsTickMs();
+    if (tick_ms > 0 && (sys_tick_ms - last_pulsing_tick) >= tick_ms) {
         last_pulsing_tick = sys_tick_ms;
 
         // Update the brightness

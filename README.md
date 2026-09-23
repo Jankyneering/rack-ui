@@ -1,7 +1,7 @@
 # Rack UI
 
-![Rack UI - Test results](/docs/rack_ui_test_pass.jpeg)
-![Rack UI - connected](/docs/rack_ui-connected.jpeg)
+![Rack UI - Test results](docs/rack_ui_test_pass.jpeg)
+![Rack UI - connected](docs/rack_ui-connected.jpeg)
 
 ## Contents
 

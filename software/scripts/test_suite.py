@@ -76,7 +76,7 @@ ANIMATIONS = [
     (0x80, "FOLLOWING", "every 4th LED lit, pattern follows rotation"),
     (0x81, "POINT", "single LED points at the rotation position"),
     (0x82, "GAUGE", "gauge fill level follows rotation, 0-100 (count resets on entry)"),
-    (0xFE, "ALL_ON", "all LEDs on at the brightness set through 0x0F (firmware default)"),
+    (0xFE, "ALL_ON", "all LEDs on at the brightness set through 0x0F"),
     (0xFF, "ALL_OFF", "all LEDs off"),
 ]
 

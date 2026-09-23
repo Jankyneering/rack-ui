@@ -60,8 +60,8 @@ starved by the display refresh.
 | `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
 | `0x06` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
 | `0x07`-`0x0D` | R/O | `0x00` | Reserved for future encoder settings. Reads return `0x00`; writes are ignored. |
-| `0x0E` | R/W | `0xFE` | Active animation, see [below](#animation-register-0x0e). |
-| `0x0F` | R/W | `0x3F` | Setting of the animation selected through `0x0E`, see [below](#animation-settings-register-0x0f). Writing a new animation id to `0x0E` reloads this register with that animation's default. |
+| `0x0E` | R/W | `0x80` | Active animation, see [below](#animation-register-0x0e). |
+| `0x0F` | R/W | `0x00` | Setting of the animation selected through `0x0E`, see [below](#animation-settings-register-0x0f). Writing a new animation id to `0x0E` reloads this register with that animation's default. |
 | `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. In IDLE mode (`0x0E` = `0x00`) these registers drive the LEDs directly; while an animation is running, the animation overwrites them. |
 | `0x1C`-`0x1F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
 | `0x20`-`0xFF` | R/W | `0x00` | General-purpose I2C RAM. Not used by the firmware; usable as 224 bytes of host scratch space. |

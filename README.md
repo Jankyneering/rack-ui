@@ -1,5 +1,8 @@
 # Rack UI
 
+![Rack UI - Test results](/docs/rack_ui_test_pass.jpeg)
+![Rack UI - connected](/docs/rack_ui-connected.jpeg)
+
 ## Contents
 
 - [**Firmware**](firmware/src/README.md) - firmware for the Rack UI front panel controller board:

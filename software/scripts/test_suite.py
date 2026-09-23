@@ -422,9 +422,9 @@ def step_soft_reset():
     gp = read_regs(REG_GP_BASE, 1)
     check(gp == [0x00], "GP RAM back to power-on default 0x00", f"GP RAM after reset {gp}")
     anim = read_regs(REG_ANIMATION, 1)
-    check(anim == [0xFE], "animation back to default ALL_ON", f"animation after reset {anim}")
+    check(anim == [0x80], "animation back to default FOLLOWING", f"animation after reset {anim}")
     settings = read_regs(REG_ANIMATION_SETTINGS, 1)
-    check(settings == [0x3F], "animation settings back to default 0x3F for ALL_ON", f"animation settings after reset {settings}")
+    check(settings == [0x00], "animation settings back to default 0x00 for FOLLOWING", f"animation settings after reset {settings}")
     config = read_regs(REG_CONFIG, 1)
     check(config == [0x00], "config back to default 0x00", f"config after reset {config}")
 

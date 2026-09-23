@@ -13,6 +13,7 @@ results. Without a display the suite still runs, console only.
 Usage: python3 test_suite.py [i2cdriver_serial_port]
 """
 
+import os
 import sys
 import time
 
@@ -44,7 +45,27 @@ CFG_PUSH_COUNT_DEC = 1 << 3
 CFG_PUSH_STATE_FLIP = 1 << 4
 CFG_LED_LINEAR = 1 << 5
 
-FW_VERSION = [0, 1]
+# Expected firmware version, read from the firmware Makefile if available
+# (set through FW_VERSION_MAJOR/FW_VERSION_MINOR, exposed big-endian in
+# registers 0x00-0x01). If the Makefile cannot be parsed the version step
+# falls back to reporting what the device reports.
+def read_fw_version():
+    makefile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "firmware", "src", "Makefile")
+    values = {}
+    try:
+        with open(makefile) as f:
+            for line in f:
+                if "?=" not in line:
+                    continue
+                key, value = line.split("?=", 1)
+                key = key.strip()
+                if key in ("FW_VERSION_MAJOR", "FW_VERSION_MINOR"):
+                    values[key] = value.strip()
+        return [int(values["FW_VERSION_MAJOR"]), int(values["FW_VERSION_MINOR"])]
+    except (OSError, KeyError, ValueError):
+        return None
+
+FW_VERSION = read_fw_version()
 
 ANIMATIONS = [
     (0x00, "IDLE", "LEDs are driven manually from registers 0x10-0x1B"),
@@ -55,7 +76,7 @@ ANIMATIONS = [
     (0x80, "FOLLOWING", "every 4th LED lit, pattern follows rotation"),
     (0x81, "POINT", "single LED points at the rotation position"),
     (0x82, "GAUGE", "gauge fill level follows rotation, 0-100 (count resets on entry)"),
-    (0xFE, "ALL_ON", "all LEDs on at the brightness set through 0x0F (firmware default)"),
+    (0xFE, "ALL_ON", "all LEDs on at the brightness set through 0x0F"),
     (0xFF, "ALL_OFF", "all LEDs off"),
 ]
 
@@ -219,6 +240,9 @@ def step_fw_version():
     version = read_regs(REG_FW_VERSION_HI, 2)
     print(f"  FW version registers 0x00-0x01: {version}")
     oled_msg(f"FW  {version[0]}.{version[1]:02d}")
+    if FW_VERSION is None:
+        print(f"  Firmware Makefile not found; device reports version {version[0]}.{version[1]:02d}")
+        return
     check(version == FW_VERSION, f"firmware version is {version}", f"unexpected firmware version {version} (expected {FW_VERSION})")
 
 
@@ -387,19 +411,20 @@ def step_animations():
 
 
 def step_soft_reset():
+    version_before = read_regs(REG_FW_VERSION_HI, 2)
     set_regs(REG_GP_BASE, [0xA5])
     print("  Writing 0x01 to register 0x00 issues a soft reset")
     oled_msg("resetting MCU...")
     set_reg(REG_SOFT_RESET, 0x01)
     time.sleep(0.5)
     version = read_regs(REG_FW_VERSION_HI, 2)
-    check(version == FW_VERSION, f"device back after reset (version {version})", f"no response after soft reset (version {version})")
+    check(version == version_before, f"device back after reset (version {version})", f"no response after soft reset (version {version}, before reset {version_before})")
     gp = read_regs(REG_GP_BASE, 1)
     check(gp == [0x00], "GP RAM back to power-on default 0x00", f"GP RAM after reset {gp}")
     anim = read_regs(REG_ANIMATION, 1)
-    check(anim == [0xFE], "animation back to default ALL_ON", f"animation after reset {anim}")
+    check(anim == [0x80], "animation back to default FOLLOWING", f"animation after reset {anim}")
     settings = read_regs(REG_ANIMATION_SETTINGS, 1)
-    check(settings == [0x3F], "animation settings back to default 0x3F for ALL_ON", f"animation settings after reset {settings}")
+    check(settings == [0x00], "animation settings back to default 0x00 for FOLLOWING", f"animation settings after reset {settings}")
     config = read_regs(REG_CONFIG, 1)
     check(config == [0x00], "config back to default 0x00", f"config after reset {config}")
 

@@ -3,15 +3,18 @@ name: firmware
 on:
   push:
     branches: [main]
+    tags:
+      - "v*"
   pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     defaults:
       run:
-        working-directory: software/src
-
+        working-directory: firmware/src
     steps:
       - uses: actions/checkout@v4
 
@@ -20,22 +23,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi
 
+      # A version tag (vX.Y) overrides the Makefile defaults, so the firmware
+      # built for a release always reports the tagged version on the device.
+      - name: Determine firmware version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+              echo "Tag '$GITHUB_REF_NAME' does not match the expected vX.Y format" >&2
+              exit 1
+            fi
+          else
+            VERSION="$(make echo-version)"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building mu-cell_rack-ui v${VERSION}"
+
       - name: Verify toolchain
         run: which arm-none-eabi-gcc && arm-none-eabi-gcc --version
 
       - name: Build firmware
         # rules.mk builds PREFIX = $(ARM_TOOLCHAIN)/arm-none-eabi-, so point at
         # the directory that actually contains the binaries (/usr/bin, not /usr).
-        run: make ARM_TOOLCHAIN=/usr/bin all
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          make ARM_TOOLCHAIN=/usr/bin FW_VERSION_MAJOR="${VERSION%%.*}" FW_VERSION_MINOR="${VERSION##*.}" all
 
       - name: Print size
-        run: arm-none-eabi-size Build/app.elf
+        run: arm-none-eabi-size Build/mu-cell_rack-ui_v${{ steps.version.outputs.version }}.elf
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: firmware
-          path: software/src/Build/
+          path: firmware/src/Build/
 
   nightly-release:
     # Publish the firmware built from the tip of main to a rolling "nightly"
@@ -46,13 +68,26 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Download firmware artifact
         uses: actions/download-artifact@v4
         with:
           name: firmware
           path: firmware
+
+      - name: Rename assets with the nightly commit
+        id: release
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
+          NAME="mu-cell_rack-ui_nightly-${SHORT_SHA}"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          cd firmware
+          for ext in bin elf hex; do
+            mv "mu-cell_rack-ui_v${VERSION}.${ext}" "${NAME}.${ext}"
+          done
 
       - name: Delete existing nightly release
         env:
@@ -63,13 +98,50 @@ jobs:
       - name: Create nightly release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
+          NAME="${{ steps.release.outputs.name }}"
           gh release create nightly \
             --repo "$GITHUB_REPOSITORY" \
             --prerelease \
-            --title "Nightly build (${SHORT_SHA})" \
+            --title "Nightly build (${{ steps.release.outputs.short_sha }})" \
             --notes "Automated firmware build from the tip of \`main\` (commit ${GITHUB_SHA}).
+          Firmware version ${VERSION}. Contains \`bin\` (raw binary for flashing), plus \`hex\` and \`elf\` files.
+          See [firmware/src/README.md](firmware/src/README.md) for flashing instructions and the I2C register map." \
+            "firmware/${NAME}.bin" "firmware/${NAME}.elf" "firmware/${NAME}.hex"
 
-          Contains \`app.bin\` (raw binary for flashing), plus \`app.hex\` and \`app.elf\`. See [software/src/README.md](software/src/README.md) for flashing instructions and the I2C register map." \
-            firmware/app.bin firmware/app.hex firmware/app.elf
+  tag-release:
+    # A pushed vX.Y tag publishes the matching versioned release with the
+    # .bin/.elf/.hex assets named after the tag.
+    needs: build
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: firmware
+
+      - name: Verify assets
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          NAME="mu-cell_rack-ui_v${VERSION}"
+          ls -l "firmware/${NAME}.bin" "firmware/${NAME}.elf" "firmware/${NAME}.hex"
+
+      - name: Create tag release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          NAME="mu-cell_rack-ui_v${VERSION}"
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "mu-cell_rack-ui v${VERSION}" \
+            --notes "Firmware release v${VERSION}.
+          Contains \`bin\` (raw binary for flashing), plus \`hex\` and \`elf\` files.
+          See [firmware/src/README.md](firmware/src/README.md) for flashing instructions and the I2C register map." \
+            "firmware/${NAME}.bin" "firmware/${NAME}.elf" "firmware/${NAME}.hex"

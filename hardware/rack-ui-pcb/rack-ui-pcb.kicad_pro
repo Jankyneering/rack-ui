@@ -588,6 +588,7 @@
       "netlist": "",
       "plot": "",
       "specctra_dsn": "",
+      "step": "rack-ui-pcb.step",
       "vrml": ""
     },
     "page_layout_descr_file": ""

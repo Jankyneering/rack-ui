@@ -44,7 +44,7 @@ typedef enum {
      * animations.c. */
 } Animation_Id_t;
 
-#define ANIMATION_DEFAULT ANIMATION_ALL_ON
+#define ANIMATION_DEFAULT ANIMATION_FOLLOWING /* Default animation at power-on. */
 
 /* Animation settings. */
 #define ANIMATION_TICK_MS 11 // Animation engine tick, driven from the main loop.

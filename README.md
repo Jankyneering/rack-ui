@@ -1,5 +1,15 @@
 # Rack UI
 
+![Rack UI - Test results](docs/rack_ui_test_pass.jpeg)
+![Rack UI - connected](docs/rack_ui-connected.jpeg)
+
+## Contents
+
+- [**Firmware**](firmware/src/README.md) - firmware for the Rack UI front panel controller board:
+  a Puya PY32F002Ax5 (Arm Cortex-M0+) acting as an I2C peripheral, exposing a rotary encoder,
+  a push button and a charlieplexed LED array to a host over a single I2C bus. Includes the
+  register map, build and flashing instructions, and prebuilt release binaries.
+
 ## License & Acknowledgements
 
 - PY32 Template from [IOsetting](https://github.com/IOsetting/py32f0-template)

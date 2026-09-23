@@ -71,7 +71,7 @@ endif
 TGT_INCFLAGS := $(addprefix -I $(TOP)/, $(INCLUDES))
 
 
-.PHONY: all clean flash echo
+.PHONY: all clean flash echo echo-version
 
 all: fullcheck $(BDIR)/$(PROJECT).elf $(BDIR)/$(PROJECT).bin $(BDIR)/$(PROJECT).hex $(BDIR)/$(PROJECT).lst
 
@@ -88,6 +88,10 @@ echo:
 	$(info 3. $(CSOURCES))
 	$(info 4. $(OBJS))
 	$(info 5. $(TGT_INCFLAGS))
+
+# print the firmware version as MAJOR.MINOR
+echo-version:
+	@echo $(FW_VERSION_MAJOR).$(FW_VERSION_MINOR)
 
 # include d files without non-exist warning
 -include $(DEPS)

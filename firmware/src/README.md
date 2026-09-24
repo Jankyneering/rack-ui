@@ -105,18 +105,18 @@ back to `IDLE`.
 | `0x04` | `BREATHING` | All LEDs smoothly fade in, hold, fade out and pause. |
 | `0x80` | `FOLLOWING` | Every 4th LED is lit and the pattern follows the encoder rotation (configurable with the `ANIMATION_FOLLOWING_LED_STEPS` constant). |
 | `0x81` | `POINT` | One LED follows the encoder rotation. |
-| `0x82` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The encoder count is capped between 0 and 100. |
+| `0x82` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The count is scaled against the maximum value set through `0x0F` (default 100) and capped between 0 and that maximum. The LEDs outside the gauge arc are held at a low brightness when `ANIMATION_GAUGE_DIM_UNUSED_LEDS` is defined (default), otherwise they keep their previous state. |
 | `0xFE` | `ALL_ON` | All LEDs on at the brightness set through `0x0F`. Default to `CHARLIE_PWM_STEPS - 1`. |
 | `0xFF` | `ALL_OFF` | All LEDs off. |
 
 ### Animation settings register (`0x0F`)
 
 Holds the setting of the animation selected through register `0x0E` (timing
-for LOADING/FLASHING/PULSING, brightness for ALL_ON and the off-state
-brightness of the non-lit LEDs for FOLLOWING/POINT). Writing a new animation id
-to `0x0E` loads that animation's default into `0x0F`; a subsequent write to
-`0x0F` adjusts the setting while the animation keeps running. A value of `0` is
-ignored and keeps the current setting.
+for LOADING/FLASHING/PULSING, brightness for ALL_ON, the off-state brightness
+of the non-lit LEDs for FOLLOWING/POINT and the maximum value for GAUGE).
+Writing a new animation id to `0x0E` loads that animation's default into
+`0x0F`; a subsequent write to `0x0F` adjusts the setting while the animation
+keeps running. A value of `0` is ignored and keeps the current setting.
 
 | Animation | Scale | Default | Meaning |
 | --- | --- | --- | --- |
@@ -127,7 +127,7 @@ ignored and keeps the current setting.
 | `BREATHING` | - | `0x00` | Timing fixed by the `ANIMATION_BREATHING_*` constants; no runtime setting. |
 | `FOLLOWING` | x brightness | `0` (off) | Brightness of the LEDs that are not lit. |
 | `POINT` | x brightness | `0` (off) | Brightness of the LEDs that are not lit. |
-| `GAUGE` | - | `0x00` | No runtime setting. |
+| `GAUGE` | x gauge max | `100` | Maximum value of the gauge range (e.g. `10` for 0-10, `250` for 0-250); the encoder count is capped between 0 and this value. |
 | `ALL_ON` | x brightness | `63` (full on) | Brightness of all LEDs. |
 | `ALL_OFF` | - | `0x00` | No setting. |
 
@@ -183,6 +183,11 @@ i2cset -y 1 0x36 0x0F 0x32
 # Turn all LEDs on at the default full brightness, then dim them to half
 i2cset -y 1 0x36 0x0E 0xFE
 i2cset -y 1 0x36 0x0F 0x20
+
+# Switch to the gauge animation (maximum 100 is loaded into 0x0F), then
+# change the range to 0-10 so each encoder detent fills a tenth of the arc
+i2cset -y 1 0x36 0x0E 0x82
+i2cset -y 1 0x36 0x0F 0x0A
 
 # Turn all LEDs off
 i2cset -y 1 0x36 0x0E 0xFF
@@ -243,6 +248,14 @@ Encoder build flags in `User/main.h`:
   the other phase or whose A/B pins are wired the other way round; note that
   swapping the phases also inverts the decoded direction, so combine it with
   `ENCODER_DIRECTION_FLIP` to keep the increment direction
+
+Animation build flags in `User/animations.h`:
+
+- `ANIMATION_GAUGE_DIM_UNUSED_LEDS` (defined) - while the GAUGE animation is
+  active, hold the three LEDs outside the gauge arc at a low fixed brightness
+  (`ANIMATION_GAUGE_UNUSED_BRIGHTNESS`) instead of leaving them at whatever
+  state the previous animation or host writes left them in; comment it out to
+  keep the previous state
 
 Output files land in `firmware/src/Build/`, named after the app and version
 (`mu-cell_rack-ui_vMAJOR.MINOR`):

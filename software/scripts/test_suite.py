@@ -4,6 +4,9 @@ Walks through the full register map (version, config bits, encoder counters,
 push button, LED brightness registers, GP RAM, soft reset) and cycles through
 every animation. Each step that needs user action displays the live encoder
 value and advances when the encoder push button is pressed and released.
+The gauge maximum (register 0x0F) is verified automatically: the suite writes
+encoder counts above, below and inside the configured range and checks the
+clamping and the LED bar levels against the firmware headers.
 
 When the optional SSD1306 128x64 OLED is fitted, every step is mirrored on it:
 the top 16 pixel rows (the yellow band on two-color modules) show a title bar
@@ -75,7 +78,7 @@ ANIMATIONS = [
     (0x04, "BREATHING", "all LEDs fade in and out"),
     (0x80, "FOLLOWING", "every 4th LED lit, pattern follows rotation"),
     (0x81, "POINT", "single LED points at the rotation position"),
-    (0x82, "GAUGE", "gauge fill level follows rotation, 0-100 (count resets on entry)"),
+    (0x82, "GAUGE", "gauge fill level follows rotation, 0-100 by default; the maximum is settable through 0x0F (count resets on entry)"),
     (0xFE, "ALL_ON", "all LEDs on at the brightness set through 0x0F"),
     (0xFF, "ALL_OFF", "all LEDs off"),
 ]
@@ -89,7 +92,53 @@ ANIMATION_SETTINGS = {
     0xFE: (None, 0x3F, "ALL_ON brightness is the value (default 0x3F = full on)"),
     0x80: (None, 0, "FOLLOWING non-lit LED brightness is the value (default 0 = off)"),
     0x81: (None, 0, "POINT non-lit LED brightness is the value (default 0 = off)"),
+    0x82: (None, 100, "GAUGE maximum is the value (default 100 = 0-100 range)"),
 }
+
+# Full-on LED register value (CHARLIE_PWM_STEPS - 1 in the firmware)
+LED_FULL = 63
+
+def read_gauge_config():
+    """Parse the gauge layout and the unused-LED dimming build flags from the
+    firmware's User/animations.h, so the expectations below track the firmware
+    the board is running. Returns None if the header cannot be parsed."""
+    header = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "firmware", "src", "User", "animations.h")
+    try:
+        with open(header) as f:
+            content = f.read()
+    except OSError:
+        return None
+
+    def define_int(name, default):
+        for line in content.splitlines():
+            parts = line.split()
+            if len(parts) >= 3 and parts[:2] == ["#define", name]:
+                try:
+                    return int(parts[2])
+                except ValueError:
+                    return default
+        return default
+
+    dim_defined = any(
+        line.split()[:2] == ["#define", "ANIMATION_GAUGE_DIM_UNUSED_LEDS"]
+        for line in content.splitlines()
+    )
+    return {
+        "start_led": define_int("ANIMATION_GAUGE_START_LED", 8),
+        "led_count": define_int("ANIMATION_GAUGE_LED_COUNT", 9),
+        "default_max": define_int("ANIMATION_GAUGE_SETTINGS_DEFAULT", 100),
+        # None when the dim flag is commented out: the unused LEDs keep their
+        # previous state and are not checked
+        "unused_brightness": define_int("ANIMATION_GAUGE_UNUSED_BRIGHTNESS", 8) if dim_defined else None,
+    }
+
+GAUGE_CONFIG = read_gauge_config()
+
+if GAUGE_CONFIG is not None and 0x82 in ANIMATION_SETTINGS:
+    # keep the expected GAUGE default in step_animations in sync with the
+    # firmware's ANIMATION_GAUGE_SETTINGS_DEFAULT
+    scale, _, description = ANIMATION_SETTINGS[0x82]
+    ANIMATION_SETTINGS[0x82] = (scale, GAUGE_CONFIG["default_max"], description)
 
 i2c = i2cdriver.I2CDriver(sys.argv[1] if len(sys.argv) > 1 else PORT)
 oled = ssd1306.probe(i2c)
@@ -393,6 +442,9 @@ def step_animations():
                 check(settings == [new_value], f"{name} brightness setting writable (0x{new_value:02X})", f"animation settings readback {settings} for {name} (expected {[new_value]})")
                 oled_msg(f"ALL ON 0x{new_value:02X}")
                 print(f"  All-on brightness changed to 0x{new_value:02X}; press to continue")
+            elif anim_id == 0x82:
+                # the dedicated gauge-range step exercises the 0x0F maximum
+                print("  Gauge maximum is checked in the gauge range step")
             elif anim_id in (0x80, 0x81):
                 new_value = 8
                 set_reg(REG_ANIMATION_SETTINGS, new_value)
@@ -408,6 +460,101 @@ def step_animations():
                 oled_msg(f"SET 0x{new_value:02X} = {new_value * scale} ms")
                 print(f"  Timing setting changed to 0x{new_value:02X} ({new_value * scale} ms); press to continue")
         live_encoder_display()
+
+
+def step_gauge_range():
+    """Verify the gauge maximum (0x0F) against the LED bar and the count clamping.
+    The encoder count registers are written directly, so the range is checked
+    end to end without waiting on the user; a live check at the end lets the
+    operator rotate the encoder and watch the 0-250 gauge fill."""
+    if GAUGE_CONFIG is None:
+        print("  firmware animations.h not found; checking the default 0-100 range only")
+        config = {"start_led": 8, "led_count": 9, "default_max": 100, "unused_brightness": 8}
+    else:
+        config = GAUGE_CONFIG
+    start_led = config["start_led"]
+    led_count = config["led_count"]
+    default_max = config["default_max"]
+    unused_brightness = config["unused_brightness"]
+
+    def arc_led(i):
+        return (i + start_led) % REG_LED_COUNT
+
+    def set_count(count):
+        value = count & 0xFFFF
+        set_reg(REG_ENC_COUNT_HI, value >> 8)
+        set_reg(REG_ENC_COUNT_LO, value & 0xFF)
+
+    def expected_levels(count, maximum):
+        """Mirror of the firmware's gauge math: each arc LED covers an equal
+        slice of the range; fully lit above its slice, off below it, fractional
+        brightness (truncated) inside it."""
+        levels = {}
+        for i in range(led_count):
+            slice_start = i * maximum / led_count
+            slice_end = (i + 1) * maximum / led_count
+            if count >= slice_end:
+                level = LED_FULL
+            elif count <= slice_start:
+                level = 0
+            else:
+                level = int((count - slice_start) / (slice_end - slice_start) * LED_FULL)
+            levels[arc_led(i)] = level
+        for i in range(REG_LED_COUNT):
+            if i not in levels and unused_brightness is not None:
+                levels[i] = unused_brightness
+        return levels
+
+    def apply_and_check(count, maximum, label):
+        set_count(count)
+        time.sleep(0.15)  # the gauge updates every 50 ms
+        expected = expected_levels(count, maximum)
+        leds = read_regs(REG_LED_BASE, REG_LED_COUNT)
+        # the count registers are host-writable, so compare the clamped value too
+        clamped = max(0, min(count, maximum))
+        read_count = get_encoder_count()
+        check(read_count == clamped, f"{label}: count clamped to {clamped}", f"{label}: count readback {read_count}, expected clamp {clamped}")
+        # only the arc LEDs (and the dimmed unused ones) are owned by the
+        # animation; when the dim flag is off the unused LEDs are unchecked
+        mismatched = [(i, leds[i], expected[i]) for i in expected if leds[i] != expected[i]]
+        check(not mismatched, f"{label}: LED bar matches the expected levels", f"{label}: LED mismatch (led, actual, expected): {mismatched}")
+
+    set_reg(REG_ANIMATION, 0x82)
+    readback = read_regs(REG_ANIMATION, 1)
+    check(readback == [0x82], "GAUGE animation selected", f"animation register readback {readback} for GAUGE")
+    settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+    check(settings == [default_max], f"GAUGE settings default {default_max} loaded into 0x0F", f"GAUGE settings readback {settings} (expected {[default_max]})")
+    oled_msg(f"GAUGE MAX {default_max}")
+
+    print(f"  Default 0-{default_max} range: count above, below and at the middle of the range")
+    apply_and_check(default_max + 50, default_max, f"above max ({default_max + 50})")
+    apply_and_check(-5, default_max, "negative")
+    apply_and_check(default_max // 2, default_max, f"half ({default_max // 2})")
+
+    print("  Writing 0 to 0x0F keeps the current maximum")
+    set_reg(REG_ANIMATION_SETTINGS, 0x00)
+    settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+    check(settings == [default_max], "zero write to 0x0F is ignored", f"GAUGE settings changed to {settings} on a zero write")
+
+    print("  Range changed to 0-10 through 0x0F")
+    set_reg(REG_ANIMATION_SETTINGS, 10)
+    settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+    check(settings == [10], "GAUGE maximum set to 10", f"GAUGE settings readback {settings} (expected [10])")
+    apply_and_check(15, 10, "above max (15, range 0-10)")
+    apply_and_check(-3, 10, "negative (range 0-10)")
+    apply_and_check(5, 10, "half (5, range 0-10)")
+
+    print("  Range changed to 0-250 through 0x0F")
+    set_reg(REG_ANIMATION_SETTINGS, 250)
+    settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+    check(settings == [250], "GAUGE maximum set to 250", f"GAUGE settings readback {settings} (expected [250])")
+    apply_and_check(125, 250, "half (125, range 0-250)")
+    apply_and_check(300, 250, "above max (300, range 0-250)")
+
+    print("  Live check: rotate the encoder and watch the 0-250 gauge fill; press to continue")
+    live_encoder_display(hint="GAUGE 0-250")
+
+    set_reg(REG_ANIMATION_SETTINGS, default_max)
 
 
 def step_soft_reset():
@@ -441,6 +588,7 @@ STEPS = [
     ("Push state inversion (CFG_PUSH_STATE_FLIP)", step_push_state_flip),
     ("Rotation direction flip (CFG_ENC_DIR_FLIP)", step_enc_dir_flip),
     ("All animations", step_animations),
+    ("Gauge maximum range (0x0F)", step_gauge_range),
     ("Soft reset", step_soft_reset),
 ]
 

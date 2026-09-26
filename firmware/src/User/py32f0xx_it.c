@@ -23,14 +23,15 @@ extern __IO I2C_Slave_State_t slave_state;
 #define I2C_INSTANCE I2C1
 
 /* Writable registers: config, encoder counters, LED brightness and the
- * general-purpose RAM area. Everything else (version, push state, reserved)
- * is read-only and master writes are ignored (pointer still advances).
+ * general-purpose RAM area. Everything else (version, push state, reset
+ * cause, reserved) is read-only and master writes are ignored (pointer
+ * still advances).
  * Register 0x00 is not writable in the normal sense: writing a non-zero
  * value to it triggers a soft reset, handled in APP_ResetRequest(). */
 static bool reg_is_writable(uint8_t reg) {
     if (reg == REG_CONFIG)
         return true;
-    if (reg >= REG_ENC_COUNT_HI && reg <= REG_ENC_PUSH_COUNT) // 0x03-0x05
+    if (reg >= REG_ENC_COUNT_HI && reg <= REG_ENC_PUSH_COUNT) // 0x04-0x06
         return true;
     if (reg == REG_ANIMATION) // 0x0E
         return true;

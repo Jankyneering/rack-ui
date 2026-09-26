@@ -45,6 +45,7 @@ extern "C" {
 #include "py32f0xx_ll_exti.h"
 #include "py32f0xx_ll_gpio.h"
 #include "py32f0xx_ll_i2c.h"
+#include "py32f0xx_ll_iwdg.h"
 #include "py32f0xx_ll_pwr.h"
 #include "py32f0xx_ll_rcc.h"
 #include "py32f0xx_ll_system.h"
@@ -77,11 +78,12 @@ extern "C" {
 #define REG_SOFT_RESET 0x00         /* W: command register (same address as version hi): \
                                         writing any non-zero value soft-resets the MCU */
 #define REG_FW_VERSION_LO 0x01      /* R/O: firmware version, low byte */
-#define REG_CONFIG 0x02             /* R/W: configuration bits, default 0x00 */
-#define REG_ENC_COUNT_HI 0x03       /* R/W: encoder rotation count, high byte */
-#define REG_ENC_COUNT_LO 0x04       /* R/W: encoder rotation count, low byte */
-#define REG_ENC_PUSH_COUNT 0x05     /* R/W: encoder push button count */
-#define REG_ENC_PUSH_STATE 0x06     /* R/O: encoder push button state */
+#define REG_RESET_CAUSE 0x02       /* R/O: reset cause of the last boot, see RESET_CAUSE_* bits */
+#define REG_CONFIG 0x03             /* R/W: configuration bits, default 0x00 */
+#define REG_ENC_COUNT_HI 0x04       /* R/W: encoder rotation count, high byte */
+#define REG_ENC_COUNT_LO 0x05       /* R/W: encoder rotation count, low byte */
+#define REG_ENC_PUSH_COUNT 0x06     /* R/W: encoder push button count */
+#define REG_ENC_PUSH_STATE 0x07     /* R/O: encoder push button state */
 #define REG_ANIMATION 0x0E          /* R/W: active animation, see animations.h:   \
                                       0x00 = IDLE (custom control over the LEDs), \
                                       0x01 = LOADING, 0x02 = FLASHING, ... */
@@ -95,6 +97,26 @@ extern "C" {
 /* 0x1C-0x1F: reserved, reads as 0x00, writes ignored */
 #define REG_GP_BASE 0x20 /* R/W: general-purpose I2C RAM */
 #define REG_GP_DEFAULT 0x00
+
+/* REG_RESET_CAUSE bit definitions (register 0x02), latched at boot from
+ * RCC_CSR and then cleared there, so the register always reports the cause
+ * of the most recent reset (not everything accumulated since power-on).
+ * Multiple bits can be set when several causes contributed (e.g. a watchdog
+ * reset is also reported as a PIN reset on some devices). */
+#define RESET_CAUSE_POR (1u << 0)   /* power-on/reset-pin (BOR/POR/PDR) reset */
+#define RESET_CAUSE_PIN (1u << 1)   /* NRST pin reset */
+#define RESET_CAUSE_SOFT (1u << 2)  /* software reset (NVIC_SystemReset, register 0x00 write) */
+#define RESET_CAUSE_IWDG (1u << 3)  /* independent watchdog reset */
+#define RESET_CAUSE_WWDG (1u << 4)  /* window watchdog reset */
+#define RESET_CAUSE_OBL (1u << 5)   /* option byte loader reset */
+/* bits 6-7: reserved, always read 0 */
+
+/* Independent watchdog (IWDG): clocked from the LSI (~32 kHz), independent of
+ * the system clock. Enabled once at boot; from then on only a reset stops
+ * it, so the main loop must keep kicking it. IWDG_TIMEOUT_MS sizes the
+ * timeout (prescaler 32 -> ~1 ms per LSI tick); keep a comfortable margin
+ * over the worst-case main-loop stall that should still recover. */
+#define IWDG_TIMEOUT_MS 500
 
 /* REG_CONFIG bit definitions */
 #define CFG_ROT_RESET_ON_READ (1u << 0)  /* 1: reset rotation count after its low byte is read */

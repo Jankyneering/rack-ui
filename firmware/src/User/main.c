@@ -28,11 +28,33 @@ static void APP_GPIOConfig(void);
 static void APP_I2C_Slave_Init(void);
 static void APP_Encoder_Init(void);
 static void APP_Charlie_Timer_Init(void);
+static void APP_IWDG_Init(void);
 static void APP_ApplyConfig(void);
 static void APP_ApplyLedRegisters(void);
 
 int main(void) {
     APP_SystemClockConfig();
+
+    /* Latch the reset cause of the boot we are running now, then clear the
+     * flags in RCC_CSR so register 0x07 reports the most recent reset only
+     * (the flags accumulate across resets otherwise). */
+    uint8_t reset_cause = 0;
+    if (LL_RCC_IsActiveFlag_PWRRST())
+        reset_cause |= RESET_CAUSE_POR;
+    if (LL_RCC_IsActiveFlag_PINRST())
+        reset_cause |= RESET_CAUSE_PIN;
+    if (LL_RCC_IsActiveFlag_SFTRST())
+        reset_cause |= RESET_CAUSE_SOFT;
+    if (LL_RCC_IsActiveFlag_IWDGRST())
+        reset_cause |= RESET_CAUSE_IWDG;
+#ifdef WWDG
+    if (LL_RCC_IsActiveFlag_WWDGRST())
+        reset_cause |= RESET_CAUSE_WWDG;
+#endif
+    if (LL_RCC_IsActiveFlag_OBLRST())
+        reset_cause |= RESET_CAUSE_OBL;
+    LL_RCC_ClearResetFlags();
+
     APP_GPIOConfig();
     APP_I2C_Slave_Init();
     APP_Encoder_Init();
@@ -56,6 +78,9 @@ int main(void) {
     /* Push state default: not pushed (bit 0 clear) */
     device_memory[REG_ENC_PUSH_STATE] = 0x00;
 
+    /* Cause of the reset that started this boot, for the host to read */
+    device_memory[REG_RESET_CAUSE] = reset_cause;
+
     /* Active animation and its timing setting, exposed in registers 0x0E-0x0F */
     device_memory[REG_ANIMATION]          = Animations_Get();
     device_memory[REG_ANIMATION_SETTINGS] = Animations_GetSettings();
@@ -63,6 +88,8 @@ int main(void) {
     /* Apply config-dependent display settings once at boot */
     APP_ApplyConfig();
     APP_ApplyLedRegisters();
+
+    APP_IWDG_Init();
 
     while (1) {
         if (reset_pending) {
@@ -76,6 +103,13 @@ int main(void) {
         // Charlie_Tick() now runs from the TIM16 update ISR at a fixed cadence;
         // sleep until any interrupt wakes us instead of spinning on the loop.
         Animations_Tick();
+
+        /* The loop wakes at least once per animation tick (ANIMATION_TICK_MS,
+         * driven by the TIM16 ISR); kick the watchdog here so a stalled main
+         * loop (or a lost tick interrupt) recovers via an IWDG reset instead
+         * of hanging silently. */
+        LL_IWDG_ReloadCounter(IWDG);
+
         __WFI();
     }
 }
@@ -252,7 +286,36 @@ static void APP_Charlie_Timer_Init(void) {
     LL_TIM_EnableCounter(TIM16);
 }
 
+/* Independent watchdog, clocked from the LSI so it keeps running even if the
+ * HSI/system clock dies. Once enabled it can only be stopped by a reset,
+ * so the main loop kicks it every iteration (see the while(1) in main()).
+ * With a /32 prescaler the ~32 kHz LSI gives a ~1 ms tick, so the timeout
+ * in ms equals the reload value + 1. The IWDG registers sit on the APB1
+ * bus but are powered independently; writing them only needs the write
+ * access key, no bus clock enable. */
+static void APP_IWDG_Init(void) {
+    LL_RCC_LSI_Enable();
+    while (LL_RCC_LSI_IsReady() != 1)
+        ;
+
+    /* While the core is halted under a debugger, freeze the watchdog so
+     * breakpoints don't trip a reset; DBGMCU needs its APB1 clock enabled. */
+    LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_DBGMCU);
+    LL_DBGMCU_APB1_GRP1_FreezePeriph(LL_DBGMCU_APB1_GRP1_IWDG_STOP);
+
+    LL_IWDG_EnableWriteAccess(IWDG);
+    LL_IWDG_SetPrescaler(IWDG, LL_IWDG_PRESCALER_32);
+    LL_IWDG_SetReloadCounter(IWDG, IWDG_TIMEOUT_MS - 1);
+    /* Wait for the prescaler and reload writes to be acknowledged before
+     * starting the counter, so the first period is the configured one. */
+    while (LL_IWDG_IsActiveFlag_PVU(IWDG) || LL_IWDG_IsActiveFlag_RVU(IWDG))
+        ;
+    LL_IWDG_ReloadCounter(IWDG);
+    LL_IWDG_Enable(IWDG);
+}
+
 void APP_ErrorHandler(void) {
+    // No kick here on purpose: the IWDG reset is the way out of a trap.
     while (1)
         ;
 }

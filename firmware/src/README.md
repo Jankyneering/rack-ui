@@ -12,6 +12,10 @@ project using the Puya LL (Low Layer) driver library.
 * **Encoder-to-I2C converter** - rotary encoder position and button presses are captured by
   interrupt and exposed through an I2C register map (see below), so a host (e.g. a Raspberry
   Pi or another MCU) can poll the panel without GPIO wiring.
+* **Watchdog** - an independent watchdog (IWDG, clocked from the LSI so it keeps running
+  even if the system clock fails) is enabled at boot and kicked by the main loop; if the
+  firmware hangs, the MCU resets itself instead of freezing the panel. The cause of the
+  last reset is exposed in register `0x07`.
 * **LED driving** - 12 LEDs are driven from 4 GPIO pins by charlieplexing, with 64-step
   software PWM and optional gamma correction (curve exponent 2.2, built into a lookup table
   at boot; toggle via config bit 5). Per-LED brightness is set through registers `0x10`-`0x1B`.
@@ -59,7 +63,8 @@ starved by the display refresh.
 | `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read if config bit 0 is set. |
 | `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
 | `0x06` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
-| `0x07`-`0x0D` | R/O | `0x00` | Reserved for future encoder settings. Reads return `0x00`; writes are ignored. |
+| `0x07` | R/O | see below | Reset cause of the most recent reset, as bit flags (see below). Latched at boot from `RCC_CSR`, then cleared there. |
+| `0x08`-`0x0D` | R/O | `0x00` | Reserved for future encoder settings. Reads return `0x00`; writes are ignored. |
 | `0x0E` | R/W | `0x80` | Active animation, see [below](#animation-register-0x0e). |
 | `0x0F` | R/W | `0x00` | Setting of the animation selected through `0x0E`, see [below](#animation-settings-register-0x0f). Writing a new animation id to `0x0E` reloads this register with that animation's default. |
 | `0x10`-`0x1B` | R/W | `0x00` | LED brightness, one register per LED (LED 0 = `0x10` ... LED 11 = `0x1B`). `0x00` = off, `0x40` = full on; values above `0x40` clamp to full on. In IDLE mode (`0x0E` = `0x00`) these registers drive the LEDs directly; while an animation is running, the animation overwrites them. |
@@ -89,6 +94,34 @@ Notes:
   coherent value.
 * Register defaults are reinitialised only at power-on/reset; the general-purpose RAM is not
   preserved across resets.
+
+### Reset cause register (`0x07`)
+
+Reports why the MCU last reset, latched from `RCC_CSR` at boot (then cleared
+there, so the register shows the most recent reset rather than everything
+accumulated since power-on). Multiple bits can be set when several causes
+contributed.
+
+| Bit | Name | Reset type |
+| --- | --- | --- |
+| 0 | `POR` | Power-on / brown-out (BOR/POR/PDR) reset |
+| 1 | `PIN` | NRST pin reset |
+| 2 | `SOFT` | Software reset (a non-zero write to register `0x00`) |
+| 3 | `IWDG` | Independent watchdog timeout |
+| 4 | `WWDG` | Window watchdog reset |
+| 5 | `OBL` | Option byte loader reset |
+
+A watchdog recovery therefore reads back with bit 3 (and typically bit 1) set.
+
+### Watchdog
+
+The independent watchdog (IWDG) is enabled once at boot with a timeout of
+`IWDG_TIMEOUT_MS` (default 500 ms) and kicked by the main loop, which wakes at
+least once per animation tick. It runs from the ~32 kHz LSI, independent of the
+system clock, so it also recovers from a loss of the HSI. Once enabled it can
+only be stopped by a reset; the soft-reset command (register `0x00`) restarts
+it cleanly. While the core is halted under a debugger the watchdog is frozen
+(`DBGMCU` IWDG stop), so breakpoints do not trip a reset.
 
 ### Animation register (`0x0E`)
 
@@ -288,6 +321,8 @@ Tunable constants (same headers, adjust and rebuild; defaults in parentheses):
 - `CHARLIE_GAMMA` (`2.2`, in `User/charlieplex.h`) - gamma exponent of the LED
   brightness curve (2.0 = simple square law, 2.2 ≈ perceptual/sRGB-style curve)
 - `I2C_SLAVE_ADDR` (`0x36`, in `User/main.h`) - I2C bus address of the device
+- `IWDG_TIMEOUT_MS` (`500`, in `User/main.h`) - independent watchdog timeout in
+  milliseconds; the main loop must wake at least once per period or the MCU resets
 
 Toolchain-level defines, set through the Makefile rather than a header:
 

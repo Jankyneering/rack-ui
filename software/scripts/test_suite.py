@@ -1,7 +1,7 @@
 """Interactive hardware test suite for the rack-ui board.
 
 Walks through the full register map (version, config bits, encoder counters,
-push button, LED brightness registers, GP RAM, soft reset) and cycles through
+push button, LED brightness registers, GP RAM, reset cause, soft reset) and cycles through
 every animation. Each step that needs user action displays the live encoder
 value and advances when the encoder push button is pressed and released.
 During the GAUGE animation of the animation cycle, the maximum range
@@ -37,6 +37,7 @@ REG_ENC_COUNT_HI = 0x03
 REG_ENC_COUNT_LO = 0x04
 REG_ENC_PUSH_COUNT = 0x05
 REG_ENC_PUSH_STATE = 0x06
+REG_RESET_CAUSE = 0x07
 REG_ANIMATION = 0x0E
 REG_ANIMATION_SETTINGS = 0x0F
 REG_LED_BASE = 0x10
@@ -49,6 +50,12 @@ CFG_ENC_DIR_FLIP = 1 << 2
 CFG_PUSH_COUNT_DEC = 1 << 3
 CFG_PUSH_STATE_FLIP = 1 << 4
 CFG_LED_LINEAR = 1 << 5
+
+# Reset cause bits (register 0x07)
+RESET_CAUSE_POR = 1 << 0
+RESET_CAUSE_PIN = 1 << 1
+RESET_CAUSE_SOFT = 1 << 2
+RESET_CAUSE_IWDG = 1 << 3
 
 # Expected firmware version, read from the firmware Makefile if available
 # (set through FW_VERSION_MAJOR/FW_VERSION_MINOR, exposed big-endian in
@@ -560,12 +567,22 @@ def gauge_range_checks():
 def step_soft_reset():
     version_before = read_regs(REG_FW_VERSION_HI, 2)
     set_regs(REG_GP_BASE, [0xA5])
+    cause_before = read_regs(REG_RESET_CAUSE, 1)[0]
+    set_reg(REG_RESET_CAUSE, 0xFF)
+    cause_ro = read_regs(REG_RESET_CAUSE, 1)[0]
+    print(f"  reset cause register 0x07: 0x{cause_before:02X}, after writing 0xFF: 0x{cause_ro:02X}")
+    check(cause_ro == cause_before and cause_ro & 0xC0 == 0, "reset cause register is read-only", f"reset cause register changed on write (0x{cause_before:02X} -> 0x{cause_ro:02X})")
     print("  Writing 0x01 to register 0x00 issues a soft reset")
     oled_msg("resetting MCU...")
     set_reg(REG_SOFT_RESET, 0x01)
     time.sleep(0.5)
     version = read_regs(REG_FW_VERSION_HI, 2)
     check(version == version_before, f"device back after reset (version {version})", f"no response after soft reset (version {version}, before reset {version_before})")
+    cause = read_regs(REG_RESET_CAUSE, 1)[0]
+    print(f"  reset cause after soft reset: 0x{cause:02X}")
+    check(cause & RESET_CAUSE_SOFT, "reset cause reports the soft reset", f"reset cause 0x{cause:02X} lacks the SOFT bit")
+    check(not (cause & RESET_CAUSE_IWDG), "reset cause shows no watchdog reset", f"reset cause 0x{cause:02X} unexpectedly reports an IWDG reset")
+    check(not (cause & RESET_CAUSE_POR), "reset cause shows only the latest reset", f"reset cause 0x{cause:02X} still reports the earlier power-on reset")
     gp = read_regs(REG_GP_BASE, 1)
     check(gp == [0x00], "GP RAM back to power-on default 0x00", f"GP RAM after reset {gp}")
     anim = read_regs(REG_ANIMATION, 1)

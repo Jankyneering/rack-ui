@@ -7,8 +7,9 @@
  *   0x00 = IDLE     : custom control over the LEDs via registers 0x10-0x1B
  *   0x01 = LOADING  : rotating loading animation
  *   0x02 = FLASHING : all LEDs flash on and off
- * Register 0x0F (REG_ANIMATION_SETTINGS) holds the timing setting of the
- *   selected animation; writing REG_ANIMATION loads that animation's default.
+ * Register 0x0F (REG_ANIMATION_SETTINGS) holds the setting of the
+ *   selected animation (timing, brightness or gauge maximum); writing
+ *   REG_ANIMATION loads that animation's default.
  ******************************************************************************
  */
 
@@ -93,6 +94,8 @@ static uint8_t Animation_SettingsDefault(uint8_t id) {
         return ANIMATION_FOLLOWING_SETTINGS_DEFAULT;
     case ANIMATION_POINT:
         return ANIMATION_POINT_SETTINGS_DEFAULT;
+    case ANIMATION_GAUGE:
+        return ANIMATION_GAUGE_SETTINGS_DEFAULT;
     default:
         return 0;
     }
@@ -452,28 +455,42 @@ static void Animation_Gauge_Step(void) {
         return;
     last_gauge_tick = sys_tick_ms;
 
+    // The animation setting (register 0x0F) is the maximum gauge value the
+    // encoder count is scaled against (e.g. 10, 100, 250)
+    int16_t gauge_max = animation_settings;
+
     // Get the current encoder rotation count
     int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
 
-    // Clamp percentage to 0-100 range
+    // Clamp the count to the 0-gauge_max range
     if (rotation_count < 0) {
         rotation_count = 0;
         // clamp device_memory[REG_ENC_COUNT_HI] and device_memory[REG_ENC_COUNT_LO] to 0
         device_memory[REG_ENC_COUNT_HI] = (uint8_t)((rotation_count >> 8) & 0xFF);
         device_memory[REG_ENC_COUNT_LO] = (uint8_t)(rotation_count & 0xFF);
-    } else if (rotation_count > 100) {
-        rotation_count = 100;
-        // clamp device_memory[REG_ENC_COUNT_HI] and device_memory[REG_ENC_COUNT_LO] to 100
+    } else if (rotation_count > gauge_max) {
+        rotation_count = gauge_max;
+        // clamp device_memory[REG_ENC_COUNT_HI] and device_memory[REG_ENC_COUNT_LO] to gauge_max
         device_memory[REG_ENC_COUNT_HI] = (uint8_t)((rotation_count >> 8) & 0xFF);
         device_memory[REG_ENC_COUNT_LO] = (uint8_t)(rotation_count & 0xFF);
     }
 
-    // calculate the brightness for each LED based on the percentage
-    // each LED represents ~8.33% of the gauge, each LED maps to a range of 0-8.33% of the total percentage
+#ifdef ANIMATION_GAUGE_DIM_UNUSED_LEDS
+    // Hold the LEDs that are not part of the gauge arc at a low brightness
+    // instead of keeping the state the previous animation left them in
+    for (uint8_t i = ANIMATION_GAUGE_LED_COUNT; i < CHARLIE_LED_COUNT; i++) {
+        device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED) % CHARLIE_LED_COUNT] =
+            ANIMATION_GAUGE_UNUSED_BRIGHTNESS;
+    }
+#endif
+
+    // calculate the brightness for each LED based on the scaled gauge value
+    // the gauge is divided evenly across the arc LEDs, e.g. with a max of 100
+    // and 9 LEDs, each LED covers an 11.1-unit range of the gauge
     for (uint8_t i = 0; i < ANIMATION_GAUGE_LED_COUNT; i++) {
-        // calculate the percentage range for this LED
-        float led_percentage_start = (i * 100.0f) / ANIMATION_GAUGE_LED_COUNT;
-        float led_percentage_end   = ((i + 1) * 100.0f) / ANIMATION_GAUGE_LED_COUNT;
+        // calculate the value range for this LED
+        float led_percentage_start = ((float)i * gauge_max) / ANIMATION_GAUGE_LED_COUNT;
+        float led_percentage_end   = ((float)(i + 1) * gauge_max) / ANIMATION_GAUGE_LED_COUNT;
 
         if (rotation_count >= led_percentage_end) {
             // LED is fully lit
@@ -482,7 +499,7 @@ static void Animation_Gauge_Step(void) {
             // LED is off
             device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED) % CHARLIE_LED_COUNT] = 0;
         } else {
-            // LED is partially lit, calculate brightness based on the percentage
+            // LED is partially lit, calculate brightness based on the scaled value
             float led_range                                                                   = led_percentage_end - led_percentage_start;
             float led_brightness_percentage                                                   = (rotation_count - led_percentage_start) / led_range;
             device_memory[REG_LED_BASE + (i + ANIMATION_GAUGE_START_LED) % CHARLIE_LED_COUNT] = (uint8_t)(led_brightness_percentage * (CHARLIE_PWM_STEPS - 1));

@@ -105,18 +105,18 @@ back to `IDLE`.
 | `0x04` | `BREATHING` | All LEDs smoothly fade in, hold, fade out and pause. |
 | `0x80` | `FOLLOWING` | Every 4th LED is lit and the pattern follows the encoder rotation (configurable with the `ANIMATION_FOLLOWING_LED_STEPS` constant). |
 | `0x81` | `POINT` | One LED follows the encoder rotation. |
-| `0x82` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The encoder count is capped between 0 and 100. |
+| `0x82` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The count is scaled against the maximum value set through `0x0F` (default 100) and capped between 0 and that maximum. The LEDs outside the gauge arc are held at a low brightness when `ANIMATION_GAUGE_DIM_UNUSED_LEDS` is defined (default), otherwise they keep their previous state. |
 | `0xFE` | `ALL_ON` | All LEDs on at the brightness set through `0x0F`. Default to `CHARLIE_PWM_STEPS - 1`. |
 | `0xFF` | `ALL_OFF` | All LEDs off. |
 
 ### Animation settings register (`0x0F`)
 
 Holds the setting of the animation selected through register `0x0E` (timing
-for LOADING/FLASHING/PULSING, brightness for ALL_ON and the off-state
-brightness of the non-lit LEDs for FOLLOWING/POINT). Writing a new animation id
-to `0x0E` loads that animation's default into `0x0F`; a subsequent write to
-`0x0F` adjusts the setting while the animation keeps running. A value of `0` is
-ignored and keeps the current setting.
+for LOADING/FLASHING/PULSING, brightness for ALL_ON, the off-state brightness
+of the non-lit LEDs for FOLLOWING/POINT and the maximum value for GAUGE).
+Writing a new animation id to `0x0E` loads that animation's default into
+`0x0F`; a subsequent write to `0x0F` adjusts the setting while the animation
+keeps running. A value of `0` is ignored and keeps the current setting.
 
 | Animation | Scale | Default | Meaning |
 | --- | --- | --- | --- |
@@ -127,7 +127,7 @@ ignored and keeps the current setting.
 | `BREATHING` | - | `0x00` | Timing fixed by the `ANIMATION_BREATHING_*` constants; no runtime setting. |
 | `FOLLOWING` | x brightness | `0` (off) | Brightness of the LEDs that are not lit. |
 | `POINT` | x brightness | `0` (off) | Brightness of the LEDs that are not lit. |
-| `GAUGE` | - | `0x00` | No runtime setting. |
+| `GAUGE` | x gauge max | `100` | Maximum value of the gauge range (e.g. `10` for 0-10, `250` for 0-250); the encoder count is capped between 0 and this value. |
 | `ALL_ON` | x brightness | `63` (full on) | Brightness of all LEDs. |
 | `ALL_OFF` | - | `0x00` | No setting. |
 
@@ -184,6 +184,11 @@ i2cset -y 1 0x36 0x0F 0x32
 i2cset -y 1 0x36 0x0E 0xFE
 i2cset -y 1 0x36 0x0F 0x20
 
+# Switch to the gauge animation (maximum 100 is loaded into 0x0F), then
+# change the range to 0-10 so each encoder detent fills a tenth of the arc
+i2cset -y 1 0x36 0x0E 0x82
+i2cset -y 1 0x36 0x0F 0x0A
+
 # Turn all LEDs off
 i2cset -y 1 0x36 0x0E 0xFF
 
@@ -230,7 +235,13 @@ names the build products. Override it for a local build with:
 make ARM_TOOLCHAIN=/usr/bin FW_VERSION_MAJOR=2 FW_VERSION_MINOR=3
 ```
 
-Encoder build flags in `User/main.h`:
+#### Build flags and tunable constants
+
+Optional `#define` flags live in the header that owns them: toggle them there
+(or pass them on the compiler command line through `LIB_FLAGS` in the
+Makefile) and rebuild.
+
+Encoder flags in `User/main.h`:
 
 - `ENCODER_TRIGGER_TOGGLE` (undefined by default) - define it to count both EncA
   edges (one tick per detent on encoders that produce one edge per detent); leave it
@@ -243,6 +254,49 @@ Encoder build flags in `User/main.h`:
   the other phase or whose A/B pins are wired the other way round; note that
   swapping the phases also inverts the decoded direction, so combine it with
   `ENCODER_DIRECTION_FLIP` to keep the increment direction
+
+Animation flags in `User/animations.h`:
+
+- `ANIMATION_GAUGE_DIM_UNUSED_LEDS` (defined) - while the GAUGE animation is
+  active, hold the three LEDs outside the gauge arc at a low fixed brightness
+  (`ANIMATION_GAUGE_UNUSED_BRIGHTNESS`) instead of leaving them at whatever
+  state the previous animation or host writes left them in; comment it out to
+  keep the previous state
+
+Tunable constants (same headers, adjust and rebuild; defaults in parentheses):
+
+- `ANIMATION_DEFAULT` (`ANIMATION_FOLLOWING`) - animation selected at power-on
+  and after a soft reset
+- `ANIMATION_GAUGE_SETTINGS_DEFAULT` (`100`) - gauge maximum loaded into `0x0F`
+  when GAUGE is selected through `0x0E`
+- `ANIMATION_GAUGE_START_LED` / `ANIMATION_GAUGE_LED_COUNT` (`8` / `9`) - first
+  LED and number of LEDs forming the gauge arc; the remaining LEDs are the
+  "unused" ones covered by `ANIMATION_GAUGE_DIM_UNUSED_LEDS`
+- `ANIMATION_GAUGE_UNUSED_BRIGHTNESS` (`8`) - brightness of the non-gauge LEDs
+  while the dim flag is in effect (`0`-`CHARLIE_PWM_STEPS - 1`)
+- `ANIMATION_FOLLOWING_LED_STEPS` (`4`) - every Nth LED is lit in FOLLOWING
+- `ANIMATION_BREATHING_IN_MS` / `ANIMATION_BREATHING_HOLD_MS` /
+  `ANIMATION_BREATHING_OUT_MS` / `ANIMATION_BREATHING_PAUSE_MS`
+  (`1500` / `750` / `2500` / `2000`) - phase durations of the breathing animation
+- `ANIMATION_*_SETTINGS_DEFAULT` - defaults loaded into `0x0F` when the
+  matching animation is selected (step time for LOADING/FLASHING/PULSING,
+  brightness for ALL_ON, off-state brightness for FOLLOWING/POINT, gauge maximum
+  for GAUGE)
+- `ANIMATION_LOADING_SETTINGS_MS` / `ANIMATION_FLASHING_SETTINGS_MS` (`10`) and
+  `ANIMATION_PULSING_SETTINGS_MS` (`1`) - milliseconds per `0x0F` register step
+- `ANIMATION_TICK_MS` (`11`) - animation engine tick, driven from the main loop
+- `CHARLIE_GAMMA` (`2.2`, in `User/charlieplex.h`) - gamma exponent of the LED
+  brightness curve (2.0 = simple square law, 2.2 ≈ perceptual/sRGB-style curve)
+- `I2C_SLAVE_ADDR` (`0x36`, in `User/main.h`) - I2C bus address of the device
+
+Toolchain-level defines, set through the Makefile rather than a header:
+
+- `FW_VERSION` - firmware version baked into registers `0x00`-`0x01`, derived
+  from `FW_VERSION_MAJOR`/`FW_VERSION_MINOR`
+- `USE_FULL_ASSERT` (undefined by default) - enable the LL drivers' parameter
+  checking: `assert_param` reports the source file and line when a driver is
+  called with an invalid parameter; costs some code size
+
 
 Output files land in `firmware/src/Build/`, named after the app and version
 (`mu-cell_rack-ui_vMAJOR.MINOR`):

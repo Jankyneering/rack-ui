@@ -78,7 +78,7 @@ extern "C" {
 #define REG_SOFT_RESET 0x00         /* W: command register (same address as version hi): \
                                         writing any non-zero value soft-resets the MCU */
 #define REG_FW_VERSION_LO 0x01      /* R/O: firmware version, low byte */
-#define REG_RESET_CAUSE 0x02       /* R/O: reset cause of the last boot, see RESET_CAUSE_* bits */
+#define REG_RESET_CAUSE 0x02        /* R/O: reset cause of the last boot, see RESET_CAUSE_* bits */
 #define REG_CONFIG 0x03             /* R/W: configuration bits, default 0x00 */
 #define REG_ENC_COUNT_HI 0x04       /* R/W: encoder rotation count, high byte */
 #define REG_ENC_COUNT_LO 0x05       /* R/W: encoder rotation count, low byte */
@@ -103,12 +103,12 @@ extern "C" {
  * of the most recent reset (not everything accumulated since power-on).
  * Multiple bits can be set when several causes contributed (e.g. a watchdog
  * reset is also reported as a PIN reset on some devices). */
-#define RESET_CAUSE_POR (1u << 0)   /* power-on/reset-pin (BOR/POR/PDR) reset */
-#define RESET_CAUSE_PIN (1u << 1)   /* NRST pin reset */
-#define RESET_CAUSE_SOFT (1u << 2)  /* software reset (NVIC_SystemReset, register 0x00 write) */
-#define RESET_CAUSE_IWDG (1u << 3)  /* independent watchdog reset */
-#define RESET_CAUSE_WWDG (1u << 4)  /* window watchdog reset */
-#define RESET_CAUSE_OBL (1u << 5)   /* option byte loader reset */
+#define RESET_CAUSE_POR (1u << 0)  /* power-on/reset-pin (BOR/POR/PDR) reset */
+#define RESET_CAUSE_PIN (1u << 1)  /* NRST pin reset */
+#define RESET_CAUSE_SOFT (1u << 2) /* software reset (NVIC_SystemReset, register 0x00 write) */
+#define RESET_CAUSE_IWDG (1u << 3) /* independent watchdog reset */
+#define RESET_CAUSE_WWDG (1u << 4) /* window watchdog reset */
+#define RESET_CAUSE_OBL (1u << 5)  /* option byte loader reset */
 /* bits 6-7: reserved, always read 0 */
 
 /* Independent watchdog (IWDG): clocked from the LSI (~32 kHz), independent of

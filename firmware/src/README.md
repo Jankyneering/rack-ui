@@ -278,13 +278,13 @@ Makefile) and rebuild.
 
 Encoder flags in `User/main.h`:
 
-- `ENCODER_TRIGGER_TOGGLE` (undefined by default) - define it to count both EncA
+* `ENCODER_TRIGGER_TOGGLE` (undefined by default) - define it to count both EncA
   edges (one tick per detent on encoders that produce one edge per detent); leave it
   commented out to count the falling edge only
-- `ENCODER_DIRECTION_FLIP` (undefined by default) - define it to make clockwise
+* `ENCODER_DIRECTION_FLIP` (undefined by default) - define it to make clockwise
   rotation decrement the count instead of incrementing, for encoder models with
   reversed phase wiring; composes with the runtime `CFG_ENC_DIR_FLIP` config bit
-- `ENCODER_AB_SWAP` (defined) - swap the phase inputs
+* `ENCODER_AB_SWAP` (defined) - swap the phase inputs
   (EncA moves to PA4, EncB to PA5) for encoder models whose trigger output sits on
   the other phase or whose A/B pins are wired the other way round; note that
   swapping the phases also inverts the decoded direction, so combine it with
@@ -292,7 +292,7 @@ Encoder flags in `User/main.h`:
 
 Animation flags in `User/animations.h`:
 
-- `ANIMATION_GAUGE_DIM_UNUSED_LEDS` (defined) - while the GAUGE animation is
+* `ANIMATION_GAUGE_DIM_UNUSED_LEDS` (defined) - while the GAUGE animation is
   active, hold the three LEDs outside the gauge arc at a low fixed brightness
   (`ANIMATION_GAUGE_UNUSED_BRIGHTNESS`) instead of leaving them at whatever
   state the previous animation or host writes left them in; comment it out to
@@ -300,40 +300,39 @@ Animation flags in `User/animations.h`:
 
 Tunable constants (same headers, adjust and rebuild; defaults in parentheses):
 
-- `ANIMATION_DEFAULT` (`ANIMATION_FOLLOWING`) - animation selected at power-on
+* `ANIMATION_DEFAULT` (`ANIMATION_FOLLOWING`) - animation selected at power-on
   and after a soft reset
-- `ANIMATION_GAUGE_SETTINGS_DEFAULT` (`100`) - gauge maximum loaded into `0x0F`
+* `ANIMATION_GAUGE_SETTINGS_DEFAULT` (`100`) - gauge maximum loaded into `0x0F`
   when GAUGE is selected through `0x0E`
-- `ANIMATION_GAUGE_START_LED` / `ANIMATION_GAUGE_LED_COUNT` (`8` / `9`) - first
+* `ANIMATION_GAUGE_START_LED` / `ANIMATION_GAUGE_LED_COUNT` (`8` / `9`) - first
   LED and number of LEDs forming the gauge arc; the remaining LEDs are the
   "unused" ones covered by `ANIMATION_GAUGE_DIM_UNUSED_LEDS`
-- `ANIMATION_GAUGE_UNUSED_BRIGHTNESS` (`8`) - brightness of the non-gauge LEDs
+* `ANIMATION_GAUGE_UNUSED_BRIGHTNESS` (`8`) - brightness of the non-gauge LEDs
   while the dim flag is in effect (`0`-`CHARLIE_PWM_STEPS - 1`)
-- `ANIMATION_FOLLOWING_LED_STEPS` (`4`) - every Nth LED is lit in FOLLOWING
-- `ANIMATION_BREATHING_IN_MS` / `ANIMATION_BREATHING_HOLD_MS` /
+* `ANIMATION_FOLLOWING_LED_STEPS` (`4`) - every Nth LED is lit in FOLLOWING
+* `ANIMATION_BREATHING_IN_MS` / `ANIMATION_BREATHING_HOLD_MS` /
   `ANIMATION_BREATHING_OUT_MS` / `ANIMATION_BREATHING_PAUSE_MS`
   (`1500` / `750` / `2500` / `2000`) - phase durations of the breathing animation
-- `ANIMATION_*_SETTINGS_DEFAULT` - defaults loaded into `0x0F` when the
+* `ANIMATION_*_SETTINGS_DEFAULT` - defaults loaded into `0x0F` when the
   matching animation is selected (step time for LOADING/FLASHING/PULSING,
   brightness for ALL_ON, off-state brightness for FOLLOWING/POINT, gauge maximum
   for GAUGE)
-- `ANIMATION_LOADING_SETTINGS_MS` / `ANIMATION_FLASHING_SETTINGS_MS` (`10`) and
+* `ANIMATION_LOADING_SETTINGS_MS` / `ANIMATION_FLASHING_SETTINGS_MS` (`10`) and
   `ANIMATION_PULSING_SETTINGS_MS` (`1`) - milliseconds per `0x0F` register step
-- `ANIMATION_TICK_MS` (`11`) - animation engine tick, driven from the main loop
-- `CHARLIE_GAMMA` (`2.2`, in `User/charlieplex.h`) - gamma exponent of the LED
+* `ANIMATION_TICK_MS` (`11`) - animation engine tick, driven from the main loop
+* `CHARLIE_GAMMA` (`2.2`, in `User/charlieplex.h`) - gamma exponent of the LED
   brightness curve (2.0 = simple square law, 2.2 ≈ perceptual/sRGB-style curve)
-- `I2C_SLAVE_ADDR` (`0x36`, in `User/main.h`) - I2C bus address of the device
-- `IWDG_TIMEOUT_MS` (`500`, in `User/main.h`) - independent watchdog timeout in
+* `I2C_SLAVE_ADDR` (`0x36`, in `User/main.h`) - I2C bus address of the device
+* `IWDG_TIMEOUT_MS` (`500`, in `User/main.h`) - independent watchdog timeout in
   milliseconds; the main loop must wake at least once per period or the MCU resets
 
 Toolchain-level defines, set through the Makefile rather than a header:
 
-- `FW_VERSION` - firmware version baked into registers `0x00`-`0x01`, derived
+* `FW_VERSION` - firmware version baked into registers `0x00`-`0x01`, derived
   from `FW_VERSION_MAJOR`/`FW_VERSION_MINOR`
-- `USE_FULL_ASSERT` (undefined by default) - enable the LL drivers' parameter
+* `USE_FULL_ASSERT` (undefined by default) - enable the LL drivers' parameter
   checking: `assert_param` reports the source file and line when a driver is
   called with an invalid parameter; costs some code size
-
 
 Output files land in `firmware/src/Build/`, named after the app and version
 (`mu-cell_rack-ui_vMAJOR.MINOR`):

@@ -36,7 +36,7 @@ int main(void) {
     APP_SystemClockConfig();
 
     /* Latch the reset cause of the boot we are running now, then clear the
-     * flags in RCC_CSR so register 0x07 reports the most recent reset only
+     * flags in RCC_CSR so register 0x02 reports the most recent reset only
      * (the flags accumulate across resets otherwise). */
     uint8_t reset_cause = 0;
     if (LL_RCC_IsActiveFlag_PWRRST())

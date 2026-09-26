@@ -32,12 +32,12 @@ SLAVE_ADDR = 0x36
 REG_FW_VERSION_HI = 0x00
 REG_SOFT_RESET = 0x00
 REG_FW_VERSION_LO = 0x01
-REG_CONFIG = 0x02
-REG_ENC_COUNT_HI = 0x03
-REG_ENC_COUNT_LO = 0x04
-REG_ENC_PUSH_COUNT = 0x05
-REG_ENC_PUSH_STATE = 0x06
-REG_RESET_CAUSE = 0x07
+REG_RESET_CAUSE = 0x02
+REG_CONFIG = 0x03
+REG_ENC_COUNT_HI = 0x04
+REG_ENC_COUNT_LO = 0x05
+REG_ENC_PUSH_COUNT = 0x06
+REG_ENC_PUSH_STATE = 0x07
 REG_ANIMATION = 0x0E
 REG_ANIMATION_SETTINGS = 0x0F
 REG_LED_BASE = 0x10
@@ -51,7 +51,7 @@ CFG_PUSH_COUNT_DEC = 1 << 3
 CFG_PUSH_STATE_FLIP = 1 << 4
 CFG_LED_LINEAR = 1 << 5
 
-# Reset cause bits (register 0x07)
+# Reset cause bits (register 0x02)
 RESET_CAUSE_POR = 1 << 0
 RESET_CAUSE_PIN = 1 << 1
 RESET_CAUSE_SOFT = 1 << 2
@@ -570,7 +570,7 @@ def step_soft_reset():
     cause_before = read_regs(REG_RESET_CAUSE, 1)[0]
     set_reg(REG_RESET_CAUSE, 0xFF)
     cause_ro = read_regs(REG_RESET_CAUSE, 1)[0]
-    print(f"  reset cause register 0x07: 0x{cause_before:02X}, after writing 0xFF: 0x{cause_ro:02X}")
+    print(f"  reset cause register 0x02: 0x{cause_before:02X}, after writing 0xFF: 0x{cause_ro:02X}")
     check(cause_ro == cause_before and cause_ro & 0xC0 == 0, "reset cause register is read-only", f"reset cause register changed on write (0x{cause_before:02X} -> 0x{cause_ro:02X})")
     print("  Writing 0x01 to register 0x00 issues a soft reset")
     oled_msg("resetting MCU...")

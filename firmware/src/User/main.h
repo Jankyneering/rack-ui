@@ -78,12 +78,12 @@ extern "C" {
 #define REG_SOFT_RESET 0x00         /* W: command register (same address as version hi): \
                                         writing any non-zero value soft-resets the MCU */
 #define REG_FW_VERSION_LO 0x01      /* R/O: firmware version, low byte */
-#define REG_CONFIG 0x02             /* R/W: configuration bits, default 0x00 */
-#define REG_ENC_COUNT_HI 0x03       /* R/W: encoder rotation count, high byte */
-#define REG_ENC_COUNT_LO 0x04       /* R/W: encoder rotation count, low byte */
-#define REG_ENC_PUSH_COUNT 0x05     /* R/W: encoder push button count */
-#define REG_ENC_PUSH_STATE 0x06     /* R/O: encoder push button state */
-#define REG_RESET_CAUSE 0x07       /* R/O: reset cause of the last boot, see RESET_CAUSE_* bits */
+#define REG_RESET_CAUSE 0x02       /* R/O: reset cause of the last boot, see RESET_CAUSE_* bits */
+#define REG_CONFIG 0x03             /* R/W: configuration bits, default 0x00 */
+#define REG_ENC_COUNT_HI 0x04       /* R/W: encoder rotation count, high byte */
+#define REG_ENC_COUNT_LO 0x05       /* R/W: encoder rotation count, low byte */
+#define REG_ENC_PUSH_COUNT 0x06     /* R/W: encoder push button count */
+#define REG_ENC_PUSH_STATE 0x07     /* R/O: encoder push button state */
 #define REG_ANIMATION 0x0E          /* R/W: active animation, see animations.h:   \
                                       0x00 = IDLE (custom control over the LEDs), \
                                       0x01 = LOADING, 0x02 = FLASHING, ... */
@@ -98,7 +98,7 @@ extern "C" {
 #define REG_GP_BASE 0x20 /* R/W: general-purpose I2C RAM */
 #define REG_GP_DEFAULT 0x00
 
-/* REG_RESET_CAUSE bit definitions (register 0x07), latched at boot from
+/* REG_RESET_CAUSE bit definitions (register 0x02), latched at boot from
  * RCC_CSR and then cleared there, so the register always reports the cause
  * of the most recent reset (not everything accumulated since power-on).
  * Multiple bits can be set when several causes contributed (e.g. a watchdog

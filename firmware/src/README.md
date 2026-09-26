@@ -15,7 +15,7 @@ project using the Puya LL (Low Layer) driver library.
 * **Watchdog** - an independent watchdog (IWDG, clocked from the LSI so it keeps running
   even if the system clock fails) is enabled at boot and kicked by the main loop; if the
   firmware hangs, the MCU resets itself instead of freezing the panel. The cause of the
-  last reset is exposed in register `0x07`.
+  last reset is exposed in register `0x02`.
 * **LED driving** - 12 LEDs are driven from 4 GPIO pins by charlieplexing, with 64-step
   software PWM and optional gamma correction (curve exponent 2.2, built into a lookup table
   at boot; toggle via config bit 5). Per-LED brightness is set through registers `0x10`-`0x1B`.
@@ -59,11 +59,11 @@ starved by the display refresh.
 | Register | Access | Default | Description |
 | --- | --- | --- | --- |
 | `0x00`-`0x01` | R/W(see note) | `0x01 0x00` | **Read**: firmware version, 16-bit big-endian (BCD-friendly: v1.0 reads `0x0100`; set through `FW_VERSION_MAJOR`/`FW_VERSION_MINOR` in the Makefile). **Write**: writing any non-zero value to `0x00` issues a soft reset (the version register is not writable; a zero write is ignored). |
-| `0x02` | R/W | `0x00` | Configuration bits, see below. |
-| `0x03`-`0x04` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read if config bit 0 is set. |
-| `0x05` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
-| `0x06` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
-| `0x07` | R/O | see below | Reset cause of the most recent reset, as bit flags (see below). Latched at boot from `RCC_CSR`, then cleared there. |
+| `0x02` | R/O | see below | Reset cause of the most recent reset, as bit flags (see below). Latched at boot from `RCC_CSR`, then cleared there. |
+| `0x03` | R/W | `0x00` | Configuration bits, see below. |
+| `0x04`-`0x05` | R/W | `0x00 0x00` | Encoder rotation count, 16-bit big-endian **signed**. Incremented/decremented on rotation; cleared after the low byte is read if config bit 0 is set. |
+| `0x06` | R/W | `0x00` | Encoder push button count, 8-bit unsigned. Updated on each debounced press; cleared after it is read if config bit 1 is set. |
+| `0x07` | R/O | `0x00` | Encoder push button state: `0x01` while pressed (or `0x00` while pressed if config bit 4 is set). Sampled live when this register is transmitted. |
 | `0x08`-`0x0D` | R/O | `0x00` | Reserved for future encoder settings. Reads return `0x00`; writes are ignored. |
 | `0x0E` | R/W | `0x80` | Active animation, see [below](#animation-register-0x0e). |
 | `0x0F` | R/W | `0x00` | Setting of the animation selected through `0x0E`, see [below](#animation-settings-register-0x0f). Writing a new animation id to `0x0E` reloads this register with that animation's default. |
@@ -71,12 +71,12 @@ starved by the display refresh.
 | `0x1C`-`0x1F` | R/O | `0x00` | Reserved. Reads return `0x00`; writes are ignored. |
 | `0x20`-`0xFF` | R/W | `0x00` | General-purpose I2C RAM. Not used by the firmware; usable as 224 bytes of host scratch space. |
 
-### Config register (`0x02`)
+### Config register (`0x03`)
 
 | Bit | Default | Description |
 | --- | --- | --- |
-| 0 | `0` | `1` = clear the rotation count (`0x03`-`0x04`) to zero after the low byte (`0x04`) is read. `0` (default) = keep the count. |
-| 1 | `0` | `1` = clear the push count (`0x05`) to zero after it is read. `0` (default) = keep the count. |
+| 0 | `0` | `1` = clear the rotation count (`0x04`-`0x05`) to zero after the low byte (`0x05`) is read. `0` (default) = keep the count. |
+| 1 | `0` | `1` = clear the push count (`0x06`) to zero after it is read. `0` (default) = keep the count. |
 | 2 | `0` | `1` = flip encoder increment direction. |
 | 3 | `0` | `1` = decrement push count on press (saturates at 0, e.g. for "count down remaining presses" logic), `0` = increment (wraps past 255). |
 | 4 | `0` | `1` = invert the reported push button state: unpressed reads `1`, pressed reads `0`. |
@@ -90,12 +90,12 @@ Notes:
 * A soft reset completes the current I2C transaction first, then resets the MCU; the bus
   release means the master sees a normal STOP rather than a stuck line. After reset, all
   registers return to their power-on defaults.
-* The rotation counter is big-endian; read `0x03` then `0x04` in one transaction for a
+* The rotation counter is big-endian; read `0x04` then `0x05` in one transaction for a
   coherent value.
 * Register defaults are reinitialised only at power-on/reset; the general-purpose RAM is not
   preserved across resets.
 
-### Reset cause register (`0x07`)
+### Reset cause register (`0x02`)
 
 Reports why the MCU last reset, latched from `RCC_CSR` at boot (then cleared
 there, so the register shows the most recent reset rather than everything
@@ -175,14 +175,16 @@ animation engine ticks every 11 ms from the main loop.
 i2ctransfer -y 1 w1@0x36 0x00 r2
 
 # Read the 16-bit encoder rotation count
-i2ctransfer -y 1 w1@0x36 0x03 r2
+i2ctransfer -y 1 w1@0x36 0x04 r2
 
 # Read the button state and push count
+i2cget -y 1 0x36 0x07
 i2cget -y 1 0x36 0x06
-i2cget -y 1 0x36 0x05
+# Read the reset cause of the last boot (bit flags, see the register table)
+i2cget -y 1 0x36 0x02
 
 # Enable reset-on-read for the rotation count and push count
-i2cset -y 1 0x36 0x02 0x03
+i2cset -y 1 0x36 0x03 0x03
 
 # Soft-reset the device (registers return to power-on defaults)
 i2cset -y 1 0x36 0x00 0x01
@@ -195,7 +197,7 @@ i2cset -y 1 0x36 0x1B 0x40
 i2ctransfer -y 1 w13@0x36 0x10 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40 0x40
 
 # Flip encoder direction and switch LEDs to linear brightness
-i2cset -y 1 0x36 0x02 0x24
+i2cset -y 1 0x36 0x03 0x24
 
 # Switch to manual LED control (IDLE), then set LED 0 to quarter brightness
 i2cset -y 1 0x36 0x0E 0x00

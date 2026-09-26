@@ -32,14 +32,14 @@ set_reg(0x20, 0xA5)
 print(f"GP RAM readback: {read_regs(0x20, 1)} (expected [165])")
 
 # 5. Encoder rotation count (clears on read only with config bit 0 set)
-set_reg(0x02, 0x03)  # enable reset-on-read for rotation and push counts
-print(f"Rotation count: {read_regs(0x03, 2)} (clears to [0, 0] on next read)")
-print(f"Rotation count after clear: {read_regs(0x03, 2)} (expected [0, 0])")
-set_reg(0x02, 0x00)  # restore defaults
+set_reg(0x03, 0x03)  # enable reset-on-read for rotation and push counts
+print(f"Rotation count: {read_regs(0x04, 2)} (clears to [0, 0] on next read)")
+print(f"Rotation count after clear: {read_regs(0x04, 2)} (expected [0, 0])")
+set_reg(0x03, 0x00)  # restore defaults
 
 # 6. Push button state and count
-print(f"Push state: {read_regs(0x06, 1)} (0x01 while pressed)")
-print(f"Push count: {read_regs(0x05, 1)} (clears to [0] on next read with bit 1 set)")
+print(f"Push state: {read_regs(0x07, 1)} (0x01 while pressed)")
+print(f"Push count: {read_regs(0x06, 1)} (clears to [0] on next read with bit 1 set)")
 
 # 7. Soft reset: writing a non-zero value to 0x00 resets the MCU.
 #    Registers return to power-on defaults (GP RAM back to 0x00).

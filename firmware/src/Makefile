@@ -3,7 +3,7 @@
 # Firmware version, inherited by the code through -D flags and exposed
 # big-endian in I2C registers 0x00-0x01 (BCD-friendly: 1.0 -> 0x0100)
 FW_VERSION_MAJOR ?= 1
-FW_VERSION_MINOR ?= 1
+FW_VERSION_MINOR ?= 0
 FW_VERSION		:= $(shell printf '0x%02X%02X' $(FW_VERSION_MAJOR) $(FW_VERSION_MINOR))
 
 PROJECT			?= mu-cell_rack-ui_v$(FW_VERSION_MAJOR).$(FW_VERSION_MINOR)

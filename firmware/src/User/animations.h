@@ -38,7 +38,7 @@ typedef enum {
     ANIMATION_FOLLOWING    = 0x80, /* LEDs follow the encoder rotation (one LED per detent) */
     ANIMATION_POINT        = 0x81, /* one LED lights up at a time, moving with the encoder rotation */
     ANIMATION_GAUGE        = 0x82, /* LEDs light up in a gauge pattern based on the encoder rotation */
-    ANIMATION_GAUGE_CENTER = 0x83, /* same as GAUGE, but the gauge fills in the opposite direction */
+    ANIMATION_GAUGE_CENTER = 0x83, /* gauge centered on the middle LED; negative counts fill one direction, positive the other */
 
     ANIMATION_ALL_ON       = 0xFE, /* all LEDs on at the brightness set through 0x0F (power-on default) */
     ANIMATION_ALL_OFF      = 0xFF, /* all LEDs off */
@@ -65,7 +65,7 @@ typedef enum {
 #define ANIMATION_FOLLOWING_SETTINGS_DEFAULT 0                  // Off-state brightness of the non-lit LEDs.
 #define ANIMATION_POINT_SETTINGS_DEFAULT 0                      // Off-state brightness of the non-lit LEDs.
 #define ANIMATION_GAUGE_SETTINGS_DEFAULT 100                    // Maximum gauge value (encoder count upper limit).
-#define ANIMATION_GAUGE_CENTER_SETTINGS_DEFAULT 50              // Maximum centered gauge value (centered encoder count upper limit; goes down to negative values (-255 to 255)).
+#define ANIMATION_GAUGE_CENTER_SETTINGS_DEFAULT 50              // Positive/negative centered gauge limit (encoder count clamped to -50..+50).
 
 /* Animation settings register scaling, in ms per register step. */
 #define ANIMATION_LOADING_SETTINGS_MS 10

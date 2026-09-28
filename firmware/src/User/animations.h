@@ -29,18 +29,19 @@ extern "C" {
 
 /* Animation IDs, matching the values written to register 0x0E. */
 typedef enum {
-    ANIMATION_IDLE      = 0x00, /* LEDs are driven manually through registers 0x10-0x1B */
-    ANIMATION_LOADING   = 0x01, /* rotating loading pattern */
-    ANIMATION_FLASHING  = 0x02, /* all LEDs flash on and off */
-    ANIMATION_PULSING   = 0x03, /* all LEDs pulse in brightness */
-    ANIMATION_BREATHING = 0x04, /* all LEDs fade in and out */
+    ANIMATION_IDLE         = 0x00, /* LEDs are driven manually through registers 0x10-0x1B */
+    ANIMATION_LOADING      = 0x01, /* rotating loading pattern */
+    ANIMATION_FLASHING     = 0x02, /* all LEDs flash on and off */
+    ANIMATION_PULSING      = 0x03, /* all LEDs pulse in brightness */
+    ANIMATION_BREATHING    = 0x04, /* all LEDs fade in and out */
 
-    ANIMATION_FOLLOWING = 0x80, /* LEDs follow the encoder rotation (one LED per detent) */
-    ANIMATION_POINT     = 0x81, /* one LED lights up at a time, moving with the encoder rotation */
-    ANIMATION_GAUGE     = 0x82, /* LEDs light up in a gauge pattern based on the encoder rotation */
+    ANIMATION_FOLLOWING    = 0x80, /* LEDs follow the encoder rotation (one LED per detent) */
+    ANIMATION_POINT        = 0x81, /* one LED lights up at a time, moving with the encoder rotation */
+    ANIMATION_GAUGE        = 0x82, /* LEDs light up in a gauge pattern based on the encoder rotation */
+    ANIMATION_GAUGE_CENTER = 0x83, /* same as GAUGE, but the gauge fills in the opposite direction */
 
-    ANIMATION_ALL_ON    = 0xFE, /* all LEDs on at the brightness set through 0x0F (power-on default) */
-    ANIMATION_ALL_OFF   = 0xFF, /* all LEDs off */
+    ANIMATION_ALL_ON       = 0xFE, /* all LEDs on at the brightness set through 0x0F (power-on default) */
+    ANIMATION_ALL_OFF      = 0xFF, /* all LEDs off */
     /* Add new animations here, then register them in the animation table in
      * animations.c. */
 } Animation_Id_t;
@@ -64,6 +65,7 @@ typedef enum {
 #define ANIMATION_FOLLOWING_SETTINGS_DEFAULT 0                  // Off-state brightness of the non-lit LEDs.
 #define ANIMATION_POINT_SETTINGS_DEFAULT 0                      // Off-state brightness of the non-lit LEDs.
 #define ANIMATION_GAUGE_SETTINGS_DEFAULT 100                    // Maximum gauge value (encoder count upper limit).
+#define ANIMATION_GAUGE_CENTER_SETTINGS_DEFAULT 50              // Maximum centered gauge value (centered encoder count upper limit; goes down to negative values (-255 to 255)).
 
 /* Animation settings register scaling, in ms per register step. */
 #define ANIMATION_LOADING_SETTINGS_MS 10

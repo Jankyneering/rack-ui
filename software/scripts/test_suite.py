@@ -522,8 +522,9 @@ def gauge_apply_and_check(count, maximum, label, start_led, led_count, unused_br
     bar against it: the count registers are host-writable, so the range is
     verified end to end without waiting on the user."""
     value = count & 0xFFFF
-    set_reg(REG_ENC_COUNT_HI, value >> 8)
-    set_reg(REG_ENC_COUNT_LO, value & 0xFF)
+    # both count bytes go in one transaction: the register pointer
+    # auto-increments, so the animation step never sees a torn value
+    set_regs(REG_ENC_COUNT_HI, [value >> 8, value & 0xFF])
     time.sleep(0.15)  # the gauge updates every 50 ms
     expected = gauge_expected_levels(count, maximum, start_led, led_count, unused_brightness)
     leds = read_regs(REG_LED_BASE, REG_LED_COUNT)
@@ -621,8 +622,9 @@ def gauge_center_apply_and_check(count, limit, label, config, unused_brightness)
     host-writable, so the range is verified end to end without waiting on
     the user."""
     value = count & 0xFFFF
-    set_reg(REG_ENC_COUNT_HI, value >> 8)
-    set_reg(REG_ENC_COUNT_LO, value & 0xFF)
+    # both count bytes go in one transaction: the register pointer
+    # auto-increments, so the animation step never sees a torn value
+    set_regs(REG_ENC_COUNT_HI, [value >> 8, value & 0xFF])
     time.sleep(0.15)  # the gauge updates every 50 ms
     expected = gauge_center_expected_levels(count, limit, config, unused_brightness)
     leds = read_regs(REG_LED_BASE, REG_LED_COUNT)

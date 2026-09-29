@@ -10,6 +10,34 @@
   a push button and a charlieplexed LED array to a host over a single I2C bus. Includes the
   register map, build and flashing instructions, and prebuilt release binaries.
 
+## Flash the firmware
+
+The Rack UI modules you can buy from the [Fred Corp. Store](https://store.fredcorp.cc) come pre-flashed with the latest firmware.
+
+If you made your own Rack Ui board, or if you have an existing Rack Ui board that needs to be updated, you can flash the firmware using the prebuilt release binary from the [firmware release page](https://github.com/yourusername/rack-ui/releases).
+
+### Tools
+
+- SWD programmer (e.g. FlipperZero with DAPLink application, J-Link, etc.) compatible with the [PyOCD](https://pyocd.io/docs/debug_probes.html) toolchain.
+- a [TC2030-NL](https://www.tag-connect.com/product/tc2030-idc-nl) programming probe or equivalent to connect the programmer to the Rack UI board's SWD header.
+
+### Software dependencies
+
+- [PyOCD](https://pyocd.io) with the [PY32F002Ax5 CMSIS pack](https://www.keil.arm.com/devices/puya-py32f002ax5/processors/) :
+
+  ```zsh
+  pip install pyocd
+  pyocd pack install py32f002ax5
+  ```
+
+### Load the firmware
+
+Use the following command to flash the firmware onto the Rack UI board. Replace `<version>` with the actual version number of the firmware you want to flash.
+
+```zsh
+pyocd load mu-cell_rack-ui_<version>.bin -t py32f002ax5
+```
+
 ## Pinout
 
 ![J5 expansion connector schematic](./docs/io-header.png)

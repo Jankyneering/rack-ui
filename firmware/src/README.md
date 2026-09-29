@@ -139,6 +139,7 @@ back to `IDLE`.
 | `0x80` | `FOLLOWING` | Every 4th LED is lit and the pattern follows the encoder rotation (configurable with the `ANIMATION_FOLLOWING_LED_STEPS` constant). |
 | `0x81` | `POINT` | One LED follows the encoder rotation. |
 | `0x82` | `GAUGE` | The LEDs form a bar graph, with the number of lit LEDs proportional to the encoder rotation count. The count is scaled against the maximum value set through `0x0F` (default 100) and capped between 0 and that maximum. The LEDs outside the gauge arc are held at a low brightness when `ANIMATION_GAUGE_DIM_UNUSED_LEDS` is defined (default), otherwise they keep their previous state. |
+| `0x83` | `GAUGE_CENTER` | Centered version of the gauge: the middle LED of the arc is always lit, and the arc fills outward from it in one direction for positive encoder counts and the other for negative ones. The count is scaled against the positive/negative limit set through `0x0F` (default 50) and clamped symmetrically to `-limit..+limit`; the clamped value is written back to the count registers. The LEDs outside the gauge arc are dimmed like `GAUGE`. |
 | `0xFE` | `ALL_ON` | All LEDs on at the brightness set through `0x0F`. Default to `CHARLIE_PWM_STEPS - 1`. |
 | `0xFF` | `ALL_OFF` | All LEDs off. |
 
@@ -146,7 +147,8 @@ back to `IDLE`.
 
 Holds the setting of the animation selected through register `0x0E` (timing
 for LOADING/FLASHING/PULSING, brightness for ALL_ON, the off-state brightness
-of the non-lit LEDs for FOLLOWING/POINT and the maximum value for GAUGE).
+of the non-lit LEDs for FOLLOWING/POINT, the maximum value for GAUGE and the
+positive/negative limit for GAUGE_CENTER).
 Writing a new animation id to `0x0E` loads that animation's default into
 `0x0F`; a subsequent write to `0x0F` adjusts the setting while the animation
 keeps running. A value of `0` is ignored and keeps the current setting.
@@ -161,6 +163,7 @@ keeps running. A value of `0` is ignored and keeps the current setting.
 | `FOLLOWING` | x brightness | `0` (off) | Brightness of the LEDs that are not lit. |
 | `POINT` | x brightness | `0` (off) | Brightness of the LEDs that are not lit. |
 | `GAUGE` | x gauge max | `100` | Maximum value of the gauge range (e.g. `10` for 0-10, `250` for 0-250); the encoder count is capped between 0 and this value. |
+| `GAUGE_CENTER` | x gauge limit | `50` | Positive/negative limit of the centered gauge (e.g. `10` for -10 to +10, `250` for -250 to +250); the encoder count is clamped symmetrically to `-limit..+limit` and each half of the arc covers `0..limit`. |
 | `ALL_ON` | x brightness | `63` (full on) | Brightness of all LEDs. |
 | `ALL_OFF` | - | `0x00` | No setting. |
 
@@ -222,6 +225,10 @@ i2cset -y 1 0x36 0x0F 0x20
 # Switch to the gauge animation (maximum 100 is loaded into 0x0F), then
 # change the range to 0-10 so each encoder detent fills a tenth of the arc
 i2cset -y 1 0x36 0x0E 0x82
+i2cset -y 1 0x36 0x0F 0x0A
+# Switch to the centered gauge animation (limit 50 is loaded into 0x0F, so the
+# count is clamped to -50..+50), then change the limit to 10 for -10 to +10
+i2cset -y 1 0x36 0x0E 0x83
 i2cset -y 1 0x36 0x0F 0x0A
 
 # Turn all LEDs off
@@ -292,11 +299,11 @@ Encoder flags in `User/main.h`:
 
 Animation flags in `User/animations.h`:
 
-* `ANIMATION_GAUGE_DIM_UNUSED_LEDS` (defined) - while the GAUGE animation is
-  active, hold the three LEDs outside the gauge arc at a low fixed brightness
-  (`ANIMATION_GAUGE_UNUSED_BRIGHTNESS`) instead of leaving them at whatever
-  state the previous animation or host writes left them in; comment it out to
-  keep the previous state
+* `ANIMATION_GAUGE_DIM_UNUSED_LEDS` (defined) - while the GAUGE or
+  GAUGE_CENTER animation is active, hold the three LEDs outside the gauge arc
+  at a low fixed brightness (`ANIMATION_GAUGE_UNUSED_BRIGHTNESS`) instead of
+  leaving them at whatever state the previous animation or host writes left
+  them in; comment it out to keep the previous state
 
 Tunable constants (same headers, adjust and rebuild; defaults in parentheses):
 
@@ -304,6 +311,8 @@ Tunable constants (same headers, adjust and rebuild; defaults in parentheses):
   and after a soft reset
 * `ANIMATION_GAUGE_SETTINGS_DEFAULT` (`100`) - gauge maximum loaded into `0x0F`
   when GAUGE is selected through `0x0E`
+* `ANIMATION_GAUGE_CENTER_SETTINGS_DEFAULT` (`50`) - positive/negative gauge
+  limit loaded into `0x0F` when GAUGE_CENTER is selected through `0x0E`
 * `ANIMATION_GAUGE_START_LED` / `ANIMATION_GAUGE_LED_COUNT` (`8` / `9`) - first
   LED and number of LEDs forming the gauge arc; the remaining LEDs are the
   "unused" ones covered by `ANIMATION_GAUGE_DIM_UNUSED_LEDS`
@@ -316,7 +325,7 @@ Tunable constants (same headers, adjust and rebuild; defaults in parentheses):
 * `ANIMATION_*_SETTINGS_DEFAULT` - defaults loaded into `0x0F` when the
   matching animation is selected (step time for LOADING/FLASHING/PULSING,
   brightness for ALL_ON, off-state brightness for FOLLOWING/POINT, gauge maximum
-  for GAUGE)
+  for GAUGE, positive/negative limit for GAUGE_CENTER)
 * `ANIMATION_LOADING_SETTINGS_MS` / `ANIMATION_FLASHING_SETTINGS_MS` (`10`) and
   `ANIMATION_PULSING_SETTINGS_MS` (`1`) - milliseconds per `0x0F` register step
 * `ANIMATION_TICK_MS` (`11`) - animation engine tick, driven from the main loop

@@ -15,6 +15,7 @@
 
 #include "animations.h"
 #include "main.h"
+#include <stdlib.h>
 
 /* External variables from main.c */
 extern volatile uint32_t sys_tick_ms;
@@ -517,8 +518,10 @@ static void Animation_Gauge_Step(void) {
 }
 
 /**
- * @brief Perform a gauge animation on the Charlieplex LEDs.
- * This animation lights up LEDs in a gauge pattern based on the encoder rotation.
+ * @brief Perform a centered gauge animation on the Charlieplex LEDs.
+ * This animation lights up LEDs outward from the center LED based on the
+ * encoder rotation: positive counts fill one direction, negative counts the
+ * other, up to the positive/negative limit set through register 0x0F.
  */
 static uint32_t last_gauge_center_tick = 0;
 static void Animation_Gauge_Center_Start(void) {
@@ -534,14 +537,15 @@ static void Animation_Gauge_Center_Step(void) {
         return;
     last_gauge_center_tick = sys_tick_ms;
 
-    // The animation setting (register 0x0F) is the Minimum/maximum gauge value the
-    // encoder count is scaled against (e.g. 10, 100, 250)
+    // The animation setting (register 0x0F) is the positive/negative gauge
+    // limit the encoder count is scaled against (e.g. 10, 100, 250); the count
+    // is clamped symmetrically to -gauge_center_max..+gauge_center_max
     int16_t gauge_center_max = animation_settings;
 
     // Get the current encoder rotation count
     int16_t rotation_count = (device_memory[REG_ENC_COUNT_LO] | (device_memory[REG_ENC_COUNT_HI] << 8));
 
-    // Clamp the count to the 0-gauge_max range
+    // Clamp the count to the -gauge_center_max..+gauge_center_max range
     if (rotation_count < -(gauge_center_max)) {
         rotation_count = -(gauge_center_max);
         // clamp device_memory[REG_ENC_COUNT_HI] and device_memory[REG_ENC_COUNT_LO] to -(gauge_center_max)
@@ -564,29 +568,45 @@ static void Animation_Gauge_Center_Step(void) {
 #endif
 
     // calculate the brightness for each LED based on the scaled gauge value
-    // the gauge is divided evenly across the arc LEDs going up or down from the center LED, e.g. with a min/max of 50
-    // Center LED is always lit at full brightness, the LEDs to the left and right of it are lit based on the encoder count,
-    // up to the 4th LED on either side of the center LED. The brightness of each LED is calculated based
-    // on the distance from the center LED and the scaled encoder count.
-    int8_t value = abs(rotation_count);
-    bool is_negative = rotation_count < 0;
-    for (uint8_t i = 0; i < (ANIMATION_GAUGE_LED_COUNT-1)/2; i++) {
-        // calculate the value range for this LED
-        float led_percentage_start = ((float)i * gauge_center_max) / (ANIMATION_GAUGE_LED_COUNT-1)/2;
-        float led_percentage_end   = ((float)(i + 1) * gauge_center_max) / (ANIMATION_GAUGE_LED_COUNT-1)/2;
+    // the gauge is divided evenly across the arc LEDs going up or down from the
+    // center LED, e.g. with a min/max of 50 and 4 LEDs per side, each LED covers
+    // a 12.5-unit range of the gauge. The center LED is always lit at full
+    // brightness, the LEDs to the left and right of it are lit based on the
+    // encoder count, up to the 4th LED on either side of the center LED.
+    int value                 = abs((int)rotation_count);
+    bool is_negative          = rotation_count < 0;
+    uint8_t side_led_count    = (ANIMATION_GAUGE_LED_COUNT - 1) / 2;
+    uint8_t center_led        = (ANIMATION_GAUGE_START_LED + side_led_count) % CHARLIE_LED_COUNT;
 
+    // Center LED is always lit at full brightness
+    device_memory[REG_LED_BASE + center_led] = CHARLIE_PWM_STEPS - 1;
+
+    for (uint8_t i = 0; i < side_led_count; i++) {
+        // calculate the value range for this LED
+        float led_percentage_start = ((float)i * gauge_center_max) / side_led_count;
+        float led_percentage_end   = ((float)(i + 1) * gauge_center_max) / side_led_count;
+
+        uint8_t level = 0;
         if (value >= led_percentage_end) {
             // LED is fully lit
-            device_memory[REG_LED_BASE + (i + (is_negative ? +8 : 1)) % CHARLIE_LED_COUNT] = CHARLIE_PWM_STEPS - 1;
+            level = CHARLIE_PWM_STEPS - 1;
         } else if (value <= led_percentage_start) {
             // LED is off
-            device_memory[REG_LED_BASE + (i + (is_negative ? +8 : 1)) % CHARLIE_LED_COUNT] = 0;
+            level = 0;
         } else {
             // LED is partially lit, calculate brightness based on the scaled value
-            float led_range                                                                   = led_percentage_end - led_percentage_start;
-            float led_brightness_percentage                                                   = (rotation_count - led_percentage_start) / led_range;
-            device_memory[REG_LED_BASE + (i + (is_negative ? +8 : 1)) % CHARLIE_LED_COUNT] = (uint8_t)(led_brightness_percentage * (CHARLIE_PWM_STEPS - 1));
+            float led_range                  = led_percentage_end - led_percentage_start;
+            float led_brightness_percentage  = (value - led_percentage_start) / led_range;
+            level                            = (uint8_t)(led_brightness_percentage * (CHARLIE_PWM_STEPS - 1));
         }
+
+        // write both sides every step so the inactive side is turned off
+        // instead of keeping the level it had before the count flipped sign
+        int8_t offset = (int8_t)(i + 1);
+        uint8_t positive_led = (uint8_t)(center_led + CHARLIE_LED_COUNT + offset) % CHARLIE_LED_COUNT;
+        uint8_t negative_led = (uint8_t)(center_led + CHARLIE_LED_COUNT - offset) % CHARLIE_LED_COUNT;
+        device_memory[REG_LED_BASE + positive_led] = is_negative ? 0 : level;
+        device_memory[REG_LED_BASE + negative_led] = is_negative ? level : 0;
     }
 
     // Mark the registers as dirty so that the main loop applies the changes

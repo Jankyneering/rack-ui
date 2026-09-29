@@ -145,7 +145,7 @@ extern "C" {
  * models whose trigger output sits on the other phase (or whose A/B pins are
  * wired the other way round). Note that swapping the phases also inverts the
  * decoded direction; combine with ENCODER_DIRECTION_FLIP to compensate. */
-#define ENCODER_AB_SWAP
+//#define ENCODER_AB_SWAP
 
 #ifdef ENCODER_AB_SWAP
 #define ENC_A_PIN LL_GPIO_PIN_4

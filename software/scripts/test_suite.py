@@ -88,6 +88,7 @@ ANIMATIONS = [
     (0x80, "FOLLOWING", "every 4th LED lit, pattern follows rotation"),
     (0x81, "POINT", "single LED points at the rotation position"),
     (0x82, "GAUGE", "gauge fill level follows rotation, 0-100 by default; the maximum is settable through 0x0F (count resets on entry)"),
+    (0x83, "GAUGE_CENTER", "centered gauge fills outward from the middle LED, -50 to +50 by default; the limit is settable through 0x0F (count resets on entry)"),
     (0xFE, "ALL_ON", "all LEDs on at the brightness set through 0x0F"),
     (0xFF, "ALL_OFF", "all LEDs off"),
 ]
@@ -102,6 +103,7 @@ ANIMATION_SETTINGS = {
     0x80: (None, 0, "FOLLOWING non-lit LED brightness is the value (default 0 = off)"),
     0x81: (None, 0, "POINT non-lit LED brightness is the value (default 0 = off)"),
     0x82: (None, 100, "GAUGE maximum is the value (default 100 = 0-100 range)"),
+    0x83: (None, 50, "GAUGE_CENTER positive/negative limit is the value (default 50 = -50 to +50 range)"),
 }
 
 # Full-on LED register value (CHARLIE_PWM_STEPS - 1 in the firmware)
@@ -136,6 +138,7 @@ def read_gauge_config():
         "start_led": define_int("ANIMATION_GAUGE_START_LED", 8),
         "led_count": define_int("ANIMATION_GAUGE_LED_COUNT", 9),
         "default_max": define_int("ANIMATION_GAUGE_SETTINGS_DEFAULT", 100),
+        "default_limit": define_int("ANIMATION_GAUGE_CENTER_SETTINGS_DEFAULT", 50),
         # None when the dim flag is commented out: the unused LEDs keep their
         # previous state and are not checked
         "unused_brightness": define_int("ANIMATION_GAUGE_UNUSED_BRIGHTNESS", 8) if dim_defined else None,
@@ -148,6 +151,12 @@ if GAUGE_CONFIG is not None and 0x82 in ANIMATION_SETTINGS:
     # firmware's ANIMATION_GAUGE_SETTINGS_DEFAULT
     scale, _, description = ANIMATION_SETTINGS[0x82]
     ANIMATION_SETTINGS[0x82] = (scale, GAUGE_CONFIG["default_max"], description)
+
+if GAUGE_CONFIG is not None and 0x83 in ANIMATION_SETTINGS:
+    # keep the expected GAUGE_CENTER default in step_animations in sync with
+    # the firmware's ANIMATION_GAUGE_CENTER_SETTINGS_DEFAULT
+    scale, _, description = ANIMATION_SETTINGS[0x83]
+    ANIMATION_SETTINGS[0x83] = (scale, GAUGE_CONFIG["default_limit"], description)
 
 i2c = i2cdriver.I2CDriver(sys.argv[1] if len(sys.argv) > 1 else PORT)
 oled = ssd1306.probe(i2c)
@@ -454,6 +463,9 @@ def step_animations():
             elif anim_id == 0x82:
                 # the full 0x0F maximum check runs while GAUGE is active
                 gauge_range_checks()
+            elif anim_id == 0x83:
+                # the full 0x0F limit check runs while GAUGE_CENTER is active
+                gauge_center_range_checks()
             elif anim_id in (0x80, 0x81):
                 new_value = 8
                 set_reg(REG_ANIMATION_SETTINGS, new_value)
@@ -480,7 +492,7 @@ def gauge_config():
     firmware's User/animations.h (so the expectations track the firmware the
     board is running) or the documented defaults if the header is missing."""
     if GAUGE_CONFIG is None:
-        return {"start_led": 8, "led_count": 9, "default_max": 100, "unused_brightness": 8}
+        return {"start_led": 8, "led_count": 9, "default_max": 100, "default_limit": 50, "unused_brightness": 8}
     return GAUGE_CONFIG
 
 
@@ -510,8 +522,9 @@ def gauge_apply_and_check(count, maximum, label, start_led, led_count, unused_br
     bar against it: the count registers are host-writable, so the range is
     verified end to end without waiting on the user."""
     value = count & 0xFFFF
-    set_reg(REG_ENC_COUNT_HI, value >> 8)
-    set_reg(REG_ENC_COUNT_LO, value & 0xFF)
+    # both count bytes go in one transaction: the register pointer
+    # auto-increments, so the animation step never sees a torn value
+    set_regs(REG_ENC_COUNT_HI, [value >> 8, value & 0xFF])
     time.sleep(0.15)  # the gauge updates every 50 ms
     expected = gauge_expected_levels(count, maximum, start_led, led_count, unused_brightness)
     leds = read_regs(REG_LED_BASE, REG_LED_COUNT)
@@ -562,6 +575,104 @@ def gauge_range_checks():
     live_encoder_display(hint="GAUGE 0-255")
 
     set_reg(REG_ANIMATION_SETTINGS, default_max)
+
+
+def gauge_center_led(offset, config):
+    """LED register index at `offset` segments from the centered gauge's
+    center LED; positive offsets are the positive-count side, negative offsets
+    the negative-count side, 0 is the center LED itself. Mirrors the firmware's
+    center_led + offset math."""
+    start_led = config["start_led"]
+    side_led_count = (config["led_count"] - 1) // 2
+    charlie_led_count = 12
+    center = (start_led + side_led_count) % charlie_led_count
+    return (center + charlie_led_count + offset) % charlie_led_count
+
+
+def gauge_center_expected_levels(count, limit, config, unused_brightness):
+    """Mirror of the firmware's centered gauge math: the center LED is always
+    full on, each side LED covers an equal slice of the 0..limit range, fully
+    lit above its slice, off below it, fractional brightness (truncated)
+    inside it; positive counts fill the +1 side, negative the -1 side."""
+    value = abs(count)
+    side_led_count = (config["led_count"] - 1) // 2
+    levels = {gauge_center_led(0, config): LED_FULL}
+    for i in range(side_led_count):
+        slice_start = i * limit / side_led_count
+        slice_end = (i + 1) * limit / side_led_count
+        if value >= slice_end:
+            level = LED_FULL
+        elif value <= slice_start:
+            level = 0
+        else:
+            level = int((value - slice_start) / (slice_end - slice_start) * LED_FULL)
+        offset = (i + 1) if count >= 0 else -(i + 1)
+        levels[gauge_center_led(offset, config)] = level
+        # the firmware writes both sides every step, so the inactive side is off
+        levels[gauge_center_led(-offset, config)] = 0
+    for i in range(REG_LED_COUNT):
+        if i not in levels and unused_brightness is not None:
+            levels[i] = unused_brightness
+    return levels
+
+
+def gauge_center_apply_and_check(count, limit, label, config, unused_brightness):
+    """Write a signed encoder count directly and check the centered gauge's
+    symmetric clamping and LED levels against it: the count registers are
+    host-writable, so the range is verified end to end without waiting on
+    the user."""
+    value = count & 0xFFFF
+    # both count bytes go in one transaction: the register pointer
+    # auto-increments, so the animation step never sees a torn value
+    set_regs(REG_ENC_COUNT_HI, [value >> 8, value & 0xFF])
+    time.sleep(0.15)  # the gauge updates every 50 ms
+    expected = gauge_center_expected_levels(count, limit, config, unused_brightness)
+    leds = read_regs(REG_LED_BASE, REG_LED_COUNT)
+    clamped = max(-limit, min(count, limit))
+    read_count = get_encoder_count()
+    check(read_count == clamped, f"{label}: count clamped to {clamped}", f"{label}: count readback {read_count}, expected clamp {clamped}")
+    mismatched = [(i, leds[i], expected[i]) for i in expected if leds[i] != expected[i]]
+    check(not mismatched, f"{label}: LED bar matches the expected levels", f"{label}: LED mismatch (led, actual, expected): {mismatched}")
+
+
+def gauge_center_range_checks():
+    """Verify the centered gauge limit (0x0F) against the LED bar and the
+    symmetric count clamping, for the default range first, then -10..+10 and
+    -255..+255."""
+    config = gauge_config()
+    default_limit = config["default_limit"]
+    unused_brightness = config["unused_brightness"]
+
+    print(f"  Default -{default_limit}..+{default_limit} range: count above, below and at the middle of each side")
+    gauge_center_apply_and_check(default_limit + 50, default_limit, f"above limit ({default_limit + 50})", config, unused_brightness)
+    gauge_center_apply_and_check(-(default_limit + 50), default_limit, f"below limit (-{default_limit + 50})", config, unused_brightness)
+    gauge_center_apply_and_check(default_limit // 2, default_limit, f"half ({default_limit // 2})", config, unused_brightness)
+    gauge_center_apply_and_check(-(default_limit // 2), default_limit, f"half negative (-{default_limit // 2})", config, unused_brightness)
+
+    print("  Writing 0 to 0x0F keeps the current limit")
+    set_reg(REG_ANIMATION_SETTINGS, 0x00)
+    settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+    check(settings == [default_limit], "zero write to 0x0F is ignored", f"GAUGE_CENTER settings changed to {settings} on a zero write")
+
+    print("  Range changed to -10..+10 through 0x0F")
+    set_reg(REG_ANIMATION_SETTINGS, 10)
+    settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+    check(settings == [10], "GAUGE_CENTER limit set to 10", f"GAUGE_CENTER settings readback {settings} (expected [10])")
+    gauge_center_apply_and_check(15, 10, "above limit (15, range -10..+10)", config, unused_brightness)
+    gauge_center_apply_and_check(-15, 10, "below limit (-15, range -10..+10)", config, unused_brightness)
+    gauge_center_apply_and_check(5, 10, "half (5, range -10..+10)", config, unused_brightness)
+
+    print("  Range changed to -255..+255 through 0x0F")
+    set_reg(REG_ANIMATION_SETTINGS, 255)
+    settings = read_regs(REG_ANIMATION_SETTINGS, 1)
+    check(settings == [255], "GAUGE_CENTER limit set to 255", f"GAUGE_CENTER settings readback {settings} (expected [255])")
+    gauge_center_apply_and_check(128, 255, "half (128, range -255..+255)", config, unused_brightness)
+    gauge_center_apply_and_check(-128, 255, "half negative (-128, range -255..+255)", config, unused_brightness)
+    gauge_center_apply_and_check(300, 255, "above limit (300, range -255..+255)", config, unused_brightness)
+
+    print("  Live check: rotate the encoder both ways and watch the centered gauge fill; press to continue")
+    live_encoder_display(hint="GAUGE +/-255")
+    set_reg(REG_ANIMATION_SETTINGS, default_limit)
 
 
 def step_soft_reset():

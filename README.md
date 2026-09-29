@@ -10,6 +10,27 @@
   a push button and a charlieplexed LED array to a host over a single I2C bus. Includes the
   register map, build and flashing instructions, and prebuilt release binaries.
 
+## Pinout
+
+![J5 expansion connector schematic](./docs/io-header.png)
+
+| Pin | Signal |
+|---|---|
+| 1 | NC |
+| 2 | +5V in |
+| 3 | RX_EN LED (green) |
+| 4 | TX_EN LED (amber) |
+| 5 | Target TXD / HT42B534-2 IC RXD |
+| 6 | Target RXD / HT42B534-2 IC TXD |
+| 7 | SCL |
+| 8 | SDA |
+| 9 | NC |
+| 10 | NC |
+| 11 | GND |
+| 12 | GND |
+
+---
+
 ## License & Acknowledgements
 
 - PY32 Template from [IOsetting](https://github.com/IOsetting/py32f0-template)

@@ -15,6 +15,7 @@
 
 #include "animations.h"
 #include "main.h"
+#include <stdlib.h>
 
 /* External variables from main.c */
 extern volatile uint32_t sys_tick_ms;

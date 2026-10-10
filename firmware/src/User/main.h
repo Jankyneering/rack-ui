@@ -72,6 +72,11 @@ extern "C" {
 /* I2C slave address (7-bit) */
 #define I2C_SLAVE_ADDR 0x36
 
+/* I2C timing/configuration, shared by the init in main.c and the ISR-side
+ * bail-out recovery in py32f0xx_it.c */
+#define I2C_SPEEDCLOCK 100000
+#define I2C_SLAVE_ADDR_SHIFTED (I2C_SLAVE_ADDR << 1)
+
 /* Register map */
 #define REG_COUNT 256               /* 0x00-0xFF, one byte each */
 #define REG_FW_VERSION_HI 0x00      /* R/O: firmware version, high byte */

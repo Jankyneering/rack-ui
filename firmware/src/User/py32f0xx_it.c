@@ -19,6 +19,15 @@ extern volatile uint32_t sys_tick_ms;
 extern volatile uint8_t device_memory[REG_COUNT];
 extern volatile uint8_t current_reg_ptr;
 extern __IO I2C_Slave_State_t slave_state;
+extern volatile bool main_heartbeat;
+
+/* Bail-out: after this many consecutive I2C interrupts that serviced no
+ * event flag, the peripheral is considered stuck (spurious IRQ storm or a
+ * transaction the state machine can no longer advance) and is recovered by
+ * a peripheral reset. At 100 kHz I2C a byte takes ~90 us, so a healthy bus
+ * never comes close to this. */
+#define I2C_STUCK_ISR_LIMIT 1000
+static uint32_t i2c_stuck_isr_count = 0;
 
 #define I2C_INSTANCE I2C1
 
@@ -70,17 +79,45 @@ static void slave_transmit_next(void) {
 }
 
 void I2C1_IRQHandler(void) {
+    bool made_progress = false;
+
     // --- 1. ERROR HANDLING ---
     if (LL_I2C_IsActiveFlag_AF(I2C_INSTANCE)) {
         LL_I2C_ClearFlag_AF(I2C_INSTANCE);
-        slave_state = I2C_STATE_IDLE;
+        slave_state      = I2C_STATE_IDLE;
+        made_progress    = true;
+    }
+    /* Bus error, arbitration lost and overrun latch flags that this handler
+     * never cleared before; with the ERR interrupt enabled they re-fire the
+     * IRQ forever at the highest priority, starving every lower-priority ISR
+     * and the main loop until the IWDG resets the MCU. Clear them and drop
+     * the transaction: the master retries on the next transfer. */
+    if (LL_I2C_IsActiveFlag_BERR(I2C_INSTANCE)) {
+        LL_I2C_ClearFlag_BERR(I2C_INSTANCE);
+        slave_state   = I2C_STATE_IDLE;
+        made_progress = true;
+    }
+    if (LL_I2C_IsActiveFlag_ARLO(I2C_INSTANCE)) {
+        LL_I2C_ClearFlag_ARLO(I2C_INSTANCE);
+        slave_state   = I2C_STATE_IDLE;
+        made_progress = true;
+    }
+    if (LL_I2C_IsActiveFlag_OVR(I2C_INSTANCE)) {
+        LL_I2C_ClearFlag_OVR(I2C_INSTANCE);
+        slave_state   = I2C_STATE_IDLE;
+        made_progress = true;
+    }
+    if (made_progress && slave_state == I2C_STATE_IDLE) {
+        i2c_stuck_isr_count = 0;
         return;
     }
 
     // --- 2. STOP CONDITION ---
     if (LL_I2C_IsActiveFlag_STOP(I2C_INSTANCE)) {
         LL_I2C_ClearFlag_STOP(I2C_INSTANCE);
-        slave_state = I2C_STATE_IDLE;
+        slave_state         = I2C_STATE_IDLE;
+        made_progress       = true;
+        i2c_stuck_isr_count = 0;
         return;
     }
     // --- 3. ADDRESS MATCH ---
@@ -99,6 +136,7 @@ void I2C1_IRQHandler(void) {
             // Transmit the first byte immediately
             slave_transmit_next();
         }
+        i2c_stuck_isr_count = 0;
         return; // Exit to allow the next byte to trigger the next interrupt
     }
 
@@ -108,6 +146,7 @@ void I2C1_IRQHandler(void) {
         if (LL_I2C_IsActiveFlag_RXNE(I2C_INSTANCE)) {
             current_reg_ptr = LL_I2C_ReceiveData8(I2C_INSTANCE);
             slave_state     = I2C_STATE_REG_PTR_SET;
+            made_progress   = true;
         }
         break;
 
@@ -116,6 +155,7 @@ void I2C1_IRQHandler(void) {
             // MASTER IS WRITING
             if (LL_I2C_IsActiveFlag_RXNE(I2C_INSTANCE)) {
                 uint8_t data = LL_I2C_ReceiveData8(I2C_INSTANCE);
+                made_progress = true;
                 if (current_reg_ptr == REG_SOFT_RESET) {
                     if (data != 0x00)
                         APP_ResetRequest(); // software reset, does not return
@@ -139,12 +179,38 @@ void I2C1_IRQHandler(void) {
             // MASTER IS READING
             if (LL_I2C_IsActiveFlag_TXE(I2C_INSTANCE) || LL_I2C_IsActiveFlag_BTF(I2C_INSTANCE)) {
                 slave_transmit_next();
+                made_progress = true;
             }
         }
         break;
 
     default:
         break;
+    }
+
+    /* Data-phase branches only consume a flag when their condition matches;
+     * count entries that did nothing so a wedged transaction (flag the state
+     * machine no longer reacts to) trips the bail-out below instead of
+     * spinning in this ISR forever at the expense of everything else. */
+    if (made_progress)
+        i2c_stuck_isr_count = 0;
+    else if (++i2c_stuck_isr_count >= I2C_STUCK_ISR_LIMIT) {
+        /* Stuck: reset the peripheral, which also releases SDA/SCL, and
+         * reconfigure it from scratch so the slave is reachable again. */
+        LL_APB1_GRP1_ForceReset(LL_APB1_GRP1_PERIPH_I2C1);
+        LL_APB1_GRP1_ReleaseReset(LL_APB1_GRP1_PERIPH_I2C1);
+        LL_I2C_InitTypeDef I2C_InitStruct = {0};
+        I2C_InitStruct.ClockSpeed      = I2C_SPEEDCLOCK;
+        I2C_InitStruct.DutyCycle       = LL_I2C_DUTYCYCLE_16_9;
+        I2C_InitStruct.OwnAddress1     = I2C_SLAVE_ADDR_SHIFTED;
+        I2C_InitStruct.TypeAcknowledge = LL_I2C_ACK;
+        LL_I2C_Init(I2C_INSTANCE, &I2C_InitStruct);
+        LL_I2C_EnableIT_EVT(I2C_INSTANCE);
+        LL_I2C_EnableIT_BUF(I2C_INSTANCE);
+        LL_I2C_EnableIT_ERR(I2C_INSTANCE);
+        LL_I2C_Enable(I2C_INSTANCE);
+        slave_state         = I2C_STATE_IDLE;
+        i2c_stuck_isr_count = 0;
     }
 }
 
@@ -215,5 +281,15 @@ void TIM16_IRQHandler(void) {
     if (LL_TIM_IsActiveFlag_UPDATE(TIM16)) {
         LL_TIM_ClearFlag_UPDATE(TIM16);
         Charlie_Tick();
+        /* Also kick the watchdog from here: this ISR runs every CHARLIE_TICK_US
+         * (well inside the IWDG window), so an interrupt storm at a lower
+         * priority no longer starves the kick. The kick is gated on the
+         * main-loop heartbeat flag so a stalled main loop still trips the
+         * IWDG, and the main loop keeps kicking on its own in case TIM16
+         * itself dies. */
+        if (main_heartbeat) {
+            main_heartbeat = false;
+            LL_IWDG_ReloadCounter(IWDG);
+        }
     }
 }

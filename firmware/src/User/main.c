@@ -2,9 +2,8 @@
 #include "animations.h"
 #include <stddef.h>
 
-/* I2C Configuration */
-#define SLAVE_ADDRESS (I2C_SLAVE_ADDR << 1)
-#define I2C_SPEEDCLOCK 100000
+/* I2C configuration lives in main.h (shared with the ISR bail-out) */
+#define SLAVE_ADDRESS I2C_SLAVE_ADDR_SHIFTED
 
 /* Private variables */
 volatile uint8_t device_memory[REG_COUNT];
@@ -31,6 +30,11 @@ static void APP_Charlie_Timer_Init(void);
 static void APP_IWDG_Init(void);
 static void APP_ApplyConfig(void);
 static void APP_ApplyLedRegisters(void);
+
+/* Main-loop heartbeat: set by the main loop each iteration, cleared (and the
+ * IWDG kicked) by the TIM16 ISR. If the main loop stalls, the flag stays
+ * clear and the ISR stops kicking, so the watchdog resets the MCU. */
+volatile bool main_heartbeat = false;
 
 int main(void) {
     APP_SystemClockConfig();
@@ -108,7 +112,7 @@ int main(void) {
          * driven by the TIM16 ISR); kick the watchdog here so a stalled main
          * loop (or a lost tick interrupt) recovers via an IWDG reset instead
          * of hanging silently. */
-        LL_IWDG_ReloadCounter(IWDG);
+        main_heartbeat = true;
 
         __WFI();
     }

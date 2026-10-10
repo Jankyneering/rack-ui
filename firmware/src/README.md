@@ -116,12 +116,22 @@ A watchdog recovery therefore reads back with bit 3 (and typically bit 1) set.
 ### Watchdog
 
 The independent watchdog (IWDG) is enabled once at boot with a timeout of
-`IWDG_TIMEOUT_MS` (default 500 ms) and kicked by the main loop, which wakes at
-least once per animation tick. It runs from the ~32 kHz LSI, independent of the
+`IWDG_TIMEOUT_MS` (default 500 ms). It is kicked from two places: the main loop
+(once per iteration) and the TIM16 refresh ISR, whose kick is gated on a
+main-loop heartbeat flag. That way an interrupt storm that starves the main
+loop no longer hangs the board until a manual power cycle — the ISR keeps the
+watchdog alive — while a genuinely stalled main loop stops the heartbeat and
+still trips the IWDG. It runs from the ~32 kHz LSI, independent of the
 system clock, so it also recovers from a loss of the HSI. Once enabled it can
 only be stopped by a reset; the soft-reset command (register `0x00`) restarts
 it cleanly. While the core is halted under a debugger the watchdog is frozen
 (`DBGMCU` IWDG stop), so breakpoints do not trip a reset.
+
+The I2C slave ISR also self-recovers instead of spinning: bus error, arbitration
+lost and overrun flags are cleared and the transaction dropped, and if the ISR
+ever services a long run of interrupts that make no progress (wedged bus or a
+stuck state machine), it resets and reconfigures the I2C peripheral, releasing
+SDA/SCL so the next master transfer succeeds.
 
 ### Animation register (`0x0E`)
 
